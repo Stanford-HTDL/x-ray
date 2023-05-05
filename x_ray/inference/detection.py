@@ -14,11 +14,11 @@ import torch
 import torchvision
 from torch.autograd import Variable
 
-import mercantile
+from .mercantile import LngLatBbox, xy
 
 
 def feature(
-    bbox: mercantile.LngLatBbox, fid=None, props=None, 
+    bbox: LngLatBbox, fid=None, props=None, 
     projected="geographic", buffer=None, precision=None, id="Bounding Box"
 ):
     """Get the GeoJSON feature corresponding to a tile
@@ -49,8 +49,8 @@ def feature(
     west, south, east, north = bbox
 
     if projected == "mercator":
-        west, south = mercantile.xy(west, south, truncate=False)
-        east, north = mercantile.xy(east, north, truncate=False)
+        west, south = xy(west, south, truncate=False)
+        east, north = xy(east, north, truncate=False)
 
     if buffer:
         west -= buffer
@@ -89,7 +89,7 @@ def feature(
 
 
 def bbox_to_geojson(
-    bbox: Sequence[float], lng_lat_bbox: mercantile.LngLatBbox, 
+    bbox: Sequence[float], lng_lat_bbox: LngLatBbox, 
     image_shape: Sequence[int]
 ) -> dict:
         y_num_pixels, x_num_pixels = image_shape # (H, W)
@@ -112,7 +112,7 @@ def bbox_to_geojson(
         bbox_east: float = west + (x_max / x_num_pixels) * lng_len
         bbox_north: float = north  - (y_min / y_num_pixels) * lat_len
 
-        bbox_ll: mercantile.LngLatBbox = mercantile.LngLatBbox(
+        bbox_ll: LngLatBbox = LngLatBbox(
             west=bbox_west, south=bbox_south, east=bbox_east, north=bbox_north
         )
 

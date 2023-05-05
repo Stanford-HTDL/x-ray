@@ -8,6 +8,6 @@ COPY ./_gcs_creds.json /_gcs_creds.json
 
 COPY ./x_ray /x_ray
 
-# COPY ./castle/celery_config /celery_config
+COPY ./models /models
 
 CMD celery -A x_ray.celery_config.celery worker -l INFO

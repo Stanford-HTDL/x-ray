@@ -4,6 +4,7 @@ import torch.nn as nn
 
 from ..utils import get_env_var_with_default
 from .model_loaders import fasterrcnn_resnet_fpn
+from .script_utils import arg_is_true
 
 
 class FasterRCNN(nn.Module):
@@ -76,26 +77,26 @@ class FasterRCNN(nn.Module):
         )
         # TRAINABLE_LAYERS: int = int(os.environ["RAINABLE_LAYERS"])
         
-        PRETRAINED: bool = bool(
+        PRETRAINED: bool = arg_is_true(
             get_env_var_with_default(
                 "PRETRAINED", default=self.DEFAULT_PRETRAINED
             )
         )
-        # PRETRAINED: bool = bool(os.environ["PRETRAINED"])
+        # PRETRAINED: bool = arg_is_true(os.environ["PRETRAINED"])
 
-        PROGRESS: bool = bool(
+        PROGRESS: bool = arg_is_true(
             get_env_var_with_default(
                 "PROGRESS", self.DEFAULT_PROGRESS
             )
         )
-        # PROGRESS: bool = bool(os.environ["PROGRESS"])
+        # PROGRESS: bool = arg_is_true(os.environ["PROGRESS"])
 
-        PRETRAINED_BACKBONE: bool = bool(
+        PRETRAINED_BACKBONE: bool = arg_is_true(
             get_env_var_with_default(
                 "PRETRAINED_BACKBONE", self.DEFAULT_PRETRAINED_BACKBONE
             )
         )
-        # PRETRAINED_BACKBONE: bool = bool(os.environ["PRETRAINED_BACKBONE"])
+        # PRETRAINED_BACKBONE: bool = arg_is_true(os.environ["PRETRAINED_BACKBONE"])
         
         MIN_SIZE: int = int(
             get_env_var_with_default(

@@ -157,9 +157,9 @@ def get_args(
         fileHandler.setFormatter(logFormatter)
         rootLogger.addHandler(fileHandler)
 
-        consoleHandler = logging.StreamHandler()
-        consoleHandler.setFormatter(logFormatter)
-        rootLogger.addHandler(consoleHandler)
+        # consoleHandler = logging.StreamHandler()
+        # consoleHandler.setFormatter(logFormatter)
+        # rootLogger.addHandler(consoleHandler)
 
         if verbose:
             for key, value in p_args.items():

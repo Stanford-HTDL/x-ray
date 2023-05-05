@@ -1,24 +1,32 @@
 __author__ = "Richard Correro (richard@richardcorrero.com)"
 
-import hashlib
 import io
+import logging
 import os
-import zipfile
-from datetime import datetime, timedelta
-from typing import Optional
+import time
+from datetime import datetime
+from typing import List
 
 import torch
 from google.cloud import storage
 
 from ..celery_config.celery import celery_app
-from ..inference.load_model_from_file import load_model
-from ..inference.predict import predict
-from ..utils import get_datetime
+from ..inference.load_model_from_file import get_device, load_model
+from ..inference.pred_processors import ObjectDetectorProcessor, Processor
+from ..inference.script_utils import get_args
+from ..utils import (blob_exists, get_datetime, get_signed_url, hash_string,
+                     upload_file_to_gcs, zip_directory_as_bytes)
+
+torch.set_num_threads(1)
+
+SCRIPT_PATH = "analyze"
 
 # IDS_PATH: str = os.environ["IDS_PATH"]
 MODEL_NAME: str = os.environ["MODEL_NAME"]
 MODEL_PATH: str = os.environ["MODEL_PATH"]
 MODEL_UID: str = os.environ["MODEL_UID"]
+
+PRED_PROCESSOR: str = os.environ["PRED_PROCESSOR"]
 DEVICE: str = os.environ["DEVICE"]
 
 GCS_CREDS_PATH: str = os.environ["GCS_CREDS_PATH"]
@@ -28,6 +36,7 @@ OUTPUT_FILE_TYPE: str = os.environ["OUTPUT_FILE_TYPE"]
 
 SIGNED_URL_EXPIRATION_MINUTES: int = int(os.environ["SIGNED_URL_EXPIRATION_MINUTES"])
 
+DEVICE: torch.device = get_device(device=DEVICE)
 # Load model into memory here so that its not reloaded every time task is called
 MODEL: torch.nn.Module = load_model(
     model_name=MODEL_NAME, model_filepath=MODEL_PATH, device=DEVICE
@@ -35,99 +44,82 @@ MODEL: torch.nn.Module = load_model(
 
 CLIENT: storage.Client = storage.Client.from_service_account_json(GCS_CREDS_PATH)
 
-
-# def get_files_as_bytes(filenames: Iterable[str]) -> io.BytesIO:
-#     # Create a BytesIO instance with the .zip file
-#     zip_file_data = io.BytesIO()
-#     with zipfile.ZipFile(zip_file_data, 'w') as zipf:
-#         for filename in filenames:
-#             zipf.write(filename)
-#     zip_file_data.seek(0)
-#     return zip_file_data
+PRED_PROCESSORS = {
+    ObjectDetectorProcessor.__name__: ObjectDetectorProcessor
+}
 
 
-def hash_string(string: str) -> str:
-    """Hash a string using the SHA-256 algorithm."""
-    # Encode the string to bytes
-    string_bytes = string.encode("utf-8")
+def prep_for_prediction(
+    model: torch.nn.Module, id: str, save_dir_path: str, device: torch.device,
+    pred_processor_name: str
+) -> Processor:
+    time_str = time.strftime("%Y%m%d_%H%M%S", time.gmtime())    
+    os.makedirs(save_dir_path, exist_ok=True)             
+    log_dir = os.path.join(save_dir_path, 'logs/').replace("\\", "/")
+    os.makedirs(log_dir, exist_ok=True)
+    log_filepath = os.path.join(
+        log_dir, f"{id}.log"
+    ).replace('\\', '/')
 
-    # Create a hash object using the SHA-256 algorithm
-    hash_object = hashlib.sha256()
+    # pred_processor_name: str = args["pred_processor"]
+    pred_processor: Processor = PRED_PROCESSORS[pred_processor_name](save_dir=save_dir_path)
 
-    # Update the hash object with the bytes of the string
-    hash_object.update(string_bytes)
-
-    # Get the hashed value as a hexadecimal string
-    hashed_string = hash_object.hexdigest()
-
-    return hashed_string
-
-
-def zip_directory_as_bytes(directory_path: str) -> io.BytesIO:
-    """Create a zip archive of a directory."""
-    zip_file_data: io.BytesIO = io.BytesIO()
-    with zipfile.ZipFile(zip_file_data, "w") as zip_file:
-        # Iterate over all the files in the directory
-        for root, _, files in os.walk(directory_path):
-            for file in files:
-                # Create the full file path by joining the directory and file paths
-                file_path: str = os.path.join(root, file)
-                # Add the file to the zip archive, using the relative path inside the directory
-                zip_file.write(file_path, os.path.relpath(file_path, directory_path))
-    zip_file_data.seek(0)
-    return zip_file_data
-
-
-def upload_file_to_gcs(
-    zip_file_data: io.BytesIO, blob_name: str, client: storage.Client, 
-    bucket_name: str, content_type: Optional[str] = 'application/zip',
-) -> None:
-    # Upload the .zip file to GCS with authentication
-    bucket = client.bucket(bucket_name)
-    blob = bucket.blob(blob_name)
-    blob.upload_from_file(zip_file_data, content_type=content_type)
-
-
-def get_signed_url(
-    blob_name: str, client: storage.Client, bucket_name: str,
-    exp_minutes: Optional[int] = 60
-) -> str:
-    # Generate a signed URL with expiration time
-    expiration_time = datetime.utcnow() + timedelta(minutes=exp_minutes)
-    bucket = client.bucket(bucket_name)
-    blob = bucket.blob(blob_name)
-    signed_url = blob.generate_signed_url(
-        expiration=expiration_time, method='GET'
+    # Note: You CANNOT place a `logging.info(...)` command before calling `get_args(...)`
+    get_args(
+        script_path=SCRIPT_PATH, log_filepath=log_filepath, 
+        **model.args, **pred_processor.args, 
+        id=id, time=time_str
     )
-    return signed_url
+
+    logging.info(f'Using device {device}')
+
+    return pred_processor
 
 
-def blob_exists(bucket_name: str, blob_name: str, gcs_creds_path: str):
-    """Check whether a blob exists in a GCS bucket."""
-    # Instantiate a client
-    storage_client = storage.Client.from_service_account_json(gcs_creds_path)
-
-    # Get the bucket and blob
-    bucket = storage_client.bucket(bucket_name)
-    blob = bucket.blob(blob_name)
-
-    # Check if the blob exists
-    return blob.exists()
+def predict(
+    model: torch.nn.Module, device: torch.device, target_geojson_strs: List[str],
+    start: str, stop: str,
+    pred_processor: Processor
+) -> None:
+    samples = pred_processor.make_samples(target_geojson_strs=target_geojson_strs, start=start, end=stop)
+    # model_num_channels: int = model.args["num_channels"]
+    model.eval()
+    sample_idx: int = 0
+    for sample in samples:
+        sample_idx += 1
+        X: torch.Tensor = sample["X"]
+        X: torch.Tensor = X.to(device=device, dtype=torch.float32)
+        # X_num_channels = X.shape[channel_axis]
+        # assert X_num_channels == model_num_channels, \
+        #     f"Network has been defined with {model_num_channels}" \
+        #     f"input channels, but loaded images have {X_num_channels}" \
+        #     "channels. Please check that the images are loaded correctly."        
+        logging.info(f"Generating predictions for sample {sample_idx}...")
+        with torch.no_grad():
+            pred = model(X)
+        logging.info(f"Saving predictions for sample {sample_idx}...")
+        pred_processor.save_results(input=sample, output=pred)
+        # save_preds(input=sample, output=pred)    
+    logging.info(
+        """
+                ================
+                =              =
+                =     Done.    =
+                =              =
+                ================
+        """
+    )
 
 
 @celery_app.task(name="analyze")
 def analyze(
-    start: str, stop: str, target_geojson: str, process_uid: str, **kwargs
+    start: str, stop: str, target_geojson: str, process_uid: str
 ) -> dict:
     start_datetime: datetime = get_datetime(start)
     start_formatted: str = start_datetime.strftime('%Y_%m')
+
     stop_datetime: datetime = get_datetime(stop)
     stop_formatted: str = stop_datetime.strftime('%Y_%m')
-
-    # if id not in VALID_IDS:
-    #     raise IDNotFoundError(
-    #         f"ID {id} not in valid IDs. Valid IDs may be found at {IDS_PATH}."
-    #     )
 
     geojson_hash: str = hash_string(target_geojson)
 
@@ -136,15 +128,18 @@ def analyze(
     
     results_blob_name: str = f"{save_dir_path}/results.zip"
 
-    # Check whether results have already been generated – if so, do not rerun analysis
+    # Check whether results have already been generated;
+    # if so, do not rerun analysis
     if not blob_exists(
         bucket_name=BUCKET_NAME, blob_name=results_blob_name, 
         gcs_creds_path=GCS_CREDS_PATH
     ):
-        predict(model=MODEL, device=DEVICE, 
-            uid=process_uid, target_geojson=target_geojson, 
-            start=start_formatted, stop_datetime=stop_formatted, 
-            save_dir_path=save_dir_path
+        pred_processor: Processor = prep_for_prediction(
+            model=MODEL, id=process_uid, save_dir_path=save_dir_path, 
+            device=DEVICE, pred_processor_name=PRED_PROCESSOR
+        )
+        predict(model=MODEL, device=DEVICE, target_geojson_strs=[target_geojson], 
+            pred_processor=pred_processor, start=start_formatted, stop=stop_formatted
         )
         zip_file_data: io.BytesIO = zip_directory_as_bytes(directory_path=save_dir_path)
         upload_file_to_gcs(
@@ -155,16 +150,5 @@ def analyze(
         blob_name=results_blob_name, client=CLIENT, bucket_name=BUCKET_NAME,
         exp_minutes=SIGNED_URL_EXPIRATION_MINUTES
     )
-
-    # blob_name = f"results/id_{id}"
-
-    # blob_name: str = "dir_0/dir_1/dir_2/lorem_ipsum.zip"
-    # content_type: str = "application/zip"
-    # exp_minutes: int = 60
-    # signed_url: str = get_signed_url(
-    #     filenames=filenames, gcs_creds_path=GCS_CREDS_PATH, 
-    #     bucket_name=BUCKET_NAME, blob_name=blob_name, 
-    #     content_type=OUTPUT_FILE_TYPE, exp_minutes=SIGNED_URL_EXPIRATION_MINUTES
-    # )
 
     return {"url": signed_url}

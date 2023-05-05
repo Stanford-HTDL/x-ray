@@ -10,7 +10,7 @@ import torch
 # from models import FasterRCNN
 from .pred_processors import (ConvLSTMCProcessor, ObjectDetectorProcessor,
                              Processor, ResNetProcessor)
-from .script_utils import get_args, get_random_string
+from .script_utils import get_args, get_random_string, arg_is_true
 
 from ..utils import get_env_var_with_default
 
@@ -66,13 +66,13 @@ def parse_args():
     )
     DATA_DIR: str = os.environ["DATA_DIR"] 
     ID: str = os.environ["ID"]
-    USE_TIME_STR_EXPERIMENT_DIR: bool = bool(get_env_var_with_default(
+    USE_TIME_STR_EXPERIMENT_DIR: bool = arg_is_true(get_env_var_with_default(
         "USE_TIME_STR_EXPERIMENT_DIR",
         default=DEFAULT_USE_TIME_STR_EXPERIMENT_DIR
     ))
     args: dict = {
         "seed": SEED,
-        "model": MODEL,
+        # "model": MODEL,
         "pred_processor": PRED_PROCESSOR,
         "model_filepath": MODEL_FILEPATH,
         "device": DEVICE,

@@ -7,19 +7,19 @@ import json
 import logging
 import os
 from collections import OrderedDict
-from typing import Generator, List, Optional, Union
+from typing import Dict, Generator, List, Optional, Union
 
 import aiohttp
-import mercantile
 import pandas as pd
 import torch
 import torchvision.transforms as T
-from detection import bbox_to_geojson
 from light_pipe import AsyncGatherer, Data, Parallelizer, Transformer
 from PIL import Image, ImageDraw
-from script_utils import async_tuple_to_args, tuple_to_args
 
 from ..utils import get_env_var_with_default
+from .detection import bbox_to_geojson
+from .mercantile import LngLatBbox, Tile, bounds, geojson_bounds, tiles
+from .script_utils import async_tuple_to_args, tuple_to_args, arg_is_true
 
 
 class Processor:
@@ -37,6 +37,12 @@ class Processor:
                 if sort_filenames:
                     filenames = self.sort_filenames(filenames)
                 yield dirpath, filenames
+
+
+    def str_to_dict(self, dict_strs: List[str]) -> Generator:
+        for dict_str in dict_strs:
+            d: dict = json.loads(dict_str)
+            yield d
 
 
     def get_filepaths(
@@ -87,14 +93,14 @@ class TimeSeriesProcessor(Processor):
 
 
     def _get_tiles(self, geojson: dict, zooms: List[str], truncate: bool) -> Generator:  
-        geo_bounds = mercantile.geojson_bounds(geojson)
+        geo_bounds = geojson_bounds(geojson)
         west = geo_bounds.west
         south = geo_bounds.south
         east = geo_bounds.east
         north = geo_bounds.north
 
-        tiles = mercantile.tiles(west, south, east, north, zooms, truncate)
-        for tile in tiles:
+        tiles_gen = tiles(west, south, east, north, zooms, truncate)
+        for tile in tiles_gen:
             yield tile     
   
 
@@ -106,7 +112,7 @@ class TimeSeriesProcessor(Processor):
 
 
     def _make_papi_time_series_requests(
-        self, tiles: List[int], geojson_name: str, start: str, end: str, 
+        self, tiles_list: List[int], geojson_name: str, start: str, end: str, 
         false_color_index: str
     ) -> Generator:
         # try:
@@ -114,7 +120,7 @@ class TimeSeriesProcessor(Processor):
         # except KeyError:
         if not geojson_name:
             geojson_name = "geojson"
-        for tile in tiles:
+        for tile in tiles_list:
             z = tile.z
             x = tile.x
             y = tile.y            
@@ -129,13 +135,13 @@ class TimeSeriesProcessor(Processor):
 
 
     def _make_planet_monthly_time_series_requests(
-        self, tiles: List[mercantile.Tile], geojson_name: str, start: str, 
+        self, tiles_list: List[Tile], geojson_name: str, start: str, 
         end: str, false_color_index: Optional[str] = None
     ) -> Generator:
-        # tiles = self._get_tiles(geojson, zooms=zooms, truncate=truncate)
-        # tiles: List[mercantile.Tile] = list(set(tiles)) # Remove duplicates
+        # tiles_list = self._get_tiles(geojson, zooms=zooms, truncate=truncate)
+        # tiles_list: List[Tile] = list(set(tiles_list)) # Remove duplicates
         requests = self._make_papi_time_series_requests(
-            tiles=tiles, geojson_name=geojson_name, start=start, end=end, 
+            tiles_list=tiles_list, geojson_name=geojson_name, start=start, end=end, 
             false_color_index=false_color_index
         )
         yield from requests 
@@ -166,7 +172,7 @@ class TimeSeriesProcessor(Processor):
 
 
     def get_planet_monthly_time_series_as_PIL_Images(
-        self, tiles: List[mercantile.Tile], start: str, end: str,
+        self, tiles_list: List[Tile], start: str, end: str,
         geojson_name: Optional[str] = "xyz", false_color_index: Optional[str] = None, 
         image_parallelizer: Optional[Parallelizer] = Parallelizer()
     ) -> Generator:
@@ -174,7 +180,7 @@ class TimeSeriesProcessor(Processor):
         #     geojson: dict = json.load(f)
 
         data: Data = Data(
-            self._make_planet_monthly_time_series_requests, tiles=tiles,
+            self._make_planet_monthly_time_series_requests, tiles_list=tiles_list,
             geojson_name=geojson_name, start=start, end=end, 
             false_color_index=false_color_index
         )
@@ -191,7 +197,7 @@ class TimeSeriesProcessor(Processor):
 class ConvLSTMCProcessor(TimeSeriesProcessor):
     __name__ = "ConvLSTMCProcessor"
 
-    DEFAULT_PRED_MANIFEST: str = "conv_lstm_c_preds.csv"
+    DEFAULT_PRED_MANIFEST: str = "preds.csv"
     DEFAULT_GEOJSON_DIR: str = "pred_bbox_geojson/"
     DEFAULT_SAVE_MANIFEST: bool = False
     DEFAULT_SAVE_GEOJSON: bool = False    
@@ -205,7 +211,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
     DEFAULT_COORDINATE_COLUMN_NAMES: List[str] = ["Z", "X", "Y"]
     DEFAULT_BBOX_THRESHOLD: float = 1e-2
 
-    NUM_TILES_PER_SUBLIST = 128
+    NUM_TILES_PER_SUBLIST = 16
     INPUT_SIZE = (224,224)
     TRANSORMS = T.Compose([
         T.Resize(INPUT_SIZE),
@@ -217,8 +223,8 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
         )
     ])
 
-    DEFAULT_START = "2022_01"
-    DEFAULT_END = "2023_01"
+    DEFAULT_START = "2023_01"
+    DEFAULT_END = "2023_02"
     DEFAULT_ZOOMS = [15]
     DEFAULT_DURATION = 250.0
     DEFAULT_SAVE_IMAGES = True
@@ -259,9 +265,8 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
                     writer = csv.writer(f)
                     writer.writerow(self.PAPI_PRED_CSV_HEADER)   
 
-            self.save_dir = save_dir
             self.pred_manifest_path = pred_manifest_path
-
+        self.save_dir = save_dir
         self.save_manifest = save_manifest
         self.from_local_files = from_local_files
         self.planet_api_key = args["planet_api_key"]
@@ -293,7 +298,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "BBOX_GEOJSON_DIR",
             default=self.DEFAULT_GEOJSON_DIR
         )
-        SAVE_MANIFEST: bool = bool(get_env_var_with_default(
+        SAVE_MANIFEST: bool = arg_is_true(get_env_var_with_default(
             "SAVE_MANIFEST",
             default=self.DEFAULT_SAVE_MANIFEST
         ))
@@ -301,7 +306,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "SAVE_GEOJSON",
             default=self.DEFAULT_SAVE_GEOJSON
         )
-        FROM_LOCAL_FILES: bool = bool(get_env_var_with_default(
+        FROM_LOCAL_FILES: bool = arg_is_true(get_env_var_with_default(
             "FROM_LOCAL_FILES",
             default=self.DEFAULT_FROM_LOCAL_FILES
         ))
@@ -326,19 +331,19 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "FC_INDEX",
             default=None
         )
-        SAVE_IMAGES: bool = bool(get_env_var_with_default(
+        SAVE_IMAGES: bool = arg_is_true(get_env_var_with_default(
             "SAVE_IMAGES",
             default=self.DEFAULT_SAVE_IMAGES
         ))
-        EMBED_DATE: bool = bool(get_env_var_with_default(
+        EMBED_DATE: bool = arg_is_true(get_env_var_with_default(
             "EMBED_DATE",
             default=self.DEFAULT_EMBED_DATE,
         ))
-        MAKE_GIFS: bool = bool(get_env_var_with_default(
+        MAKE_GIFS: bool = arg_is_true(get_env_var_with_default(
             "MAKE_GIFS",
             default=self.DEFAULT_MAKE_GIFS,
         ))
-        FROM_PREDS_CSV: bool = bool(get_env_var_with_default(
+        FROM_PREDS_CSV: bool = arg_is_true(get_env_var_with_default(
             "FROM_PREDS_CSV",
             default=self.DEFAULT_FROM_PREDS_CSV
         ))
@@ -346,7 +351,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "PREDS_CSV_PATH",
             default=self.DEFAULT_PREDS_CSV_PATH
         )        
-        FILTER_BY_TARGET_VALUE: bool = bool(get_env_var_with_default(
+        FILTER_BY_TARGET_VALUE: bool = arg_is_true(get_env_var_with_default(
             "FILTER_BY_TARGET_VALUE",
             default=self.DEFAULT_FILTER_BY_TARGET_VALUE
         ))
@@ -358,16 +363,13 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "TARGET_COLUMN_NAME",
             default=self.DEFAULT_TARGET_COLUMN_NAME
         )
-        COORDINATE_COLUMN_NAME: List[str] = get_env_var_with_default(
+        COORDINATE_COLUMN_NAMES: List[str] = get_env_var_with_default(
             "COORDINATE",
             default=self.DEFAULT_COORDINATE_COLUMN_NAMES,
-            nargs="+",
-            type=str
         )
         BBOX_THRESHOLD: float = float(get_env_var_with_default(
             "BBOX_THRESHOLD",
             default=self.DEFAULT_BBOX_THRESHOLD,
-            type=float,
         ))
         args: dict = {
             "pred_manifest": PRED_MANIFEST,
@@ -389,7 +391,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "filter_by_target_value": FILTER_BY_TARGET_VALUE,
             "target_value": TARGET_VALUE,
             "target_column_name": TARGET_COLUMN_NAME,
-            "coordinate_column_name": COORDINATE_COLUMN_NAME,
+            "coordinate_column_names": COORDINATE_COLUMN_NAMES,
             "bbox_threshold": BBOX_THRESHOLD
         }
         return args                    
@@ -409,7 +411,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
                 draw = ImageDraw.Draw(image)
                 draw.text((0, 0), f"{year} {month} {z} {x} {y}",(255,255,255))                   
 
-        if make_gifs:
+        if make_gifs and len(images) > 1:
             gif_filename = f"{start}_{end}/{z}/{target_name}/{z}_{x}_{y}/{start}_{end}.{timelapse_format}"
             gif_filepath = os.path.join(save_dir, tile_dir, f"{timelapse_format}s", gif_filename).replace("\\", "/")
             os.makedirs(os.path.dirname(gif_filepath), exist_ok=True)
@@ -463,7 +465,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             z = tile_coords[0]
             x = tile_coords[1]
             y = tile_coords[2]
-            tile = mercantile.Tile(x=x, y=y, z=z)
+            tile = Tile(x=x, y=y, z=z)
             yield tile        
 
 
@@ -479,7 +481,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
         parallelizer: Optional[Parallelizer] = Parallelizer()
     ):
 
-        # def yield_tiles(tiles: List[mercantile.Tile]) -> Generator:
+        # def yield_tiles(tiles: List[Tile]) -> Generator:
         #     yield tiles
 
 
@@ -494,16 +496,16 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
         #      >> Transformer(self._open_geojson) \
         #      >> Transformer(tuple_to_args(self._get_tiles), zooms=zooms, truncate=truncate)
 
-        tiles: List[mercantile.Tile] = data(block=True)
-        tiles = list(set(tiles)) # Remove duplicates
+        tiles_list: List[Tile] = data(block=True)
+        tiles_list = list(set(tiles_list)) # Remove duplicates
         
         # Chunk tiles to prevent order bottlenecks
-        tiles = [
-            tiles[i:i + num_tiles_per_sublist] for i in range(0, len(tiles), num_tiles_per_sublist)
+        tiles_chunked = [
+            tiles_list[i:i + num_tiles_per_sublist] for i in range(0, len(tiles_list), num_tiles_per_sublist)
         ]
         # tiles = [tiles]
 
-        data = Data(tiles)
+        data = Data(tiles_chunked)
 
         data >> Transformer(
                 tuple_to_args(self.get_planet_monthly_time_series_as_PIL_Images),
@@ -525,33 +527,36 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
 
 
     def _make_samples_from_planet_api(
-        self, geojson_dir_path: str, start: str, end: str, zooms: List[int], 
+        self, geojson_dir_path: str | None, geojson_strs: List[str] | None, 
+        start: str, end: str, zooms: List[int], 
         false_color_index: Optional[str] = None, truncate: Optional[bool] = True, 
         num_tiles_per_sublist: Optional[int] = 16,
         image_parallelizer: Optional[Parallelizer] = Parallelizer(),
         parallelizer: Optional[Parallelizer] = Parallelizer()
     ):
 
-        # def yield_tiles(tiles: List[mercantile.Tile]) -> Generator:
+        # def yield_tiles(tiles: List[Tile]) -> Generator:
         #     yield tiles
+        if geojson_strs is not None:
+            data: Data = Data(self.str_to_dict, dict_strs=geojson_strs)
+            data >> Transformer(tuple_to_args(self._get_tiles), zooms=zooms, truncate=truncate)
+        else:
+            data: Data = Data(self.walk_dir, dir_path=geojson_dir_path)
 
+            data >> Transformer(tuple_to_args(self.get_filepaths), as_list=False) \
+                >> Transformer(self._open_geojson) \
+                >> Transformer(tuple_to_args(self._get_tiles), zooms=zooms, truncate=truncate)
 
-        data: Data = Data(self.walk_dir, dir_path=geojson_dir_path)
-
-        data >> Transformer(tuple_to_args(self.get_filepaths), as_list=False) \
-             >> Transformer(self._open_geojson) \
-             >> Transformer(tuple_to_args(self._get_tiles), zooms=zooms, truncate=truncate)
-
-        tiles: List[mercantile.Tile] = data(block=True)
-        tiles = list(set(tiles)) # Remove duplicates
+        tiles_list: List[Tile] = data(block=True)
+        tiles_list = list(set(tiles_list)) # Remove duplicates
         
         # Chunk tiles to prevent order bottlenecks (HTTP 503 errors)
-        tiles = [
-            tiles[i:i + num_tiles_per_sublist] for i in range(0, len(tiles), num_tiles_per_sublist)
+        tiles_chunked = [
+            tiles_list[i:i + num_tiles_per_sublist] for i in range(0, len(tiles_list), num_tiles_per_sublist)
         ]
         # tiles = [tiles]
 
-        data = Data(tiles)
+        data = Data(tiles_chunked)
 
         data >> Transformer(
                 tuple_to_args(self.get_planet_monthly_time_series_as_PIL_Images),
@@ -590,11 +595,17 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
 
 
     def make_samples(
-        self, from_local_files: Optional[bool] = None, 
+        self, from_local_files: Optional[bool] = None,
         dir_path: Optional[str]  = None,
+        target_geojson_strs: Optional[List[str]] = None,
+        start: Optional[str] = None, end: Optional[str] = None,
         parallelizer: Optional[Parallelizer] = Parallelizer(), 
         **kwargs
     ) -> Generator:
+        if start is None:
+            start = self.start
+        if end is None:
+            end = self.end
         if from_local_files is None:
             from_local_files: bool = self.from_local_files
         if from_local_files:
@@ -603,7 +614,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             )
         elif self.from_preds_csv:
             yield from self._make_samples_from_preds_csv_path(
-                preds_csv_path=self.preds_csv_path, start=self.start, end=self.end, 
+                preds_csv_path=self.preds_csv_path, start=start, end=end, 
                 zooms=self.zooms, false_color_index=self.fc_index, 
                 parallelizer=parallelizer, 
                 num_tiles_per_sublist=self.NUM_TILES_PER_SUBLIST, 
@@ -614,13 +625,15 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
                 **kwargs                
             )
         else:
+            assert dir_path is not None or target_geojson_strs is not None, \
+                f"Either `target_geojson_strs` or `dir_path` must be passed."
             yield from self._make_samples_from_planet_api(
-                geojson_dir_path=dir_path, start=self.start, end=self.end, 
+                geojson_dir_path=dir_path, geojson_strs=target_geojson_strs, 
+                start=start, end=end, 
                 zooms=self.zooms, false_color_index=self.fc_index, 
                 parallelizer=parallelizer, 
                 num_tiles_per_sublist=self.NUM_TILES_PER_SUBLIST, **kwargs
             )
-
 
     def _save_results_from_local_files(self, input: dict, output: torch.Tensor) -> None:
         filepaths: List[str] = input["args"][0]
@@ -651,11 +664,11 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
         y: int = input["args"][2]
         geojson_name: str = input["args"][3]
 
-        tile: mercantile.Tile = mercantile.Tile(x=x, y=y, z=z)
-        # ul: mercantile.LngLat = mercantile.ul(tile)
+        tile: Tile = Tile(x=x, y=y, z=z)
+        # ul: LngLat = ul(tile)
         # lng = ul.lng
         # lat = ul.lat
-        lng_lat_bbox: mercantile.LngLatBbox = mercantile.bounds(tile)
+        lng_lat_bbox: LngLatBbox = bounds(tile)
         west: float = lng_lat_bbox.west
         south: float = lng_lat_bbox.south
         east: float = lng_lat_bbox.east
@@ -766,11 +779,11 @@ class ObjectDetectorProcessor(ResNetProcessor):
         y: int = input["args"][2]
         geojson_name: str = input["args"][3]
 
-        tile: mercantile.Tile = mercantile.Tile(x=x, y=y, z=z)
-        # ul: mercantile.LngLat = mercantile.ul(tile)
+        tile: Tile = Tile(x=x, y=y, z=z)
+        # ul: LngLat = ul(tile)
         # lng = ul.lng
         # lat = ul.lat
-        lng_lat_bbox: mercantile.LngLatBbox = mercantile.bounds(tile)
+        lng_lat_bbox: LngLatBbox = bounds(tile)
         west: float = lng_lat_bbox.west
         south: float = lng_lat_bbox.south
         east: float = lng_lat_bbox.east
