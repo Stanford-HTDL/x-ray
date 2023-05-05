@@ -1,1 +1,15 @@
 __pycache__/
+logs/
+models/
+x-ray3.10/
+
+env*/
+
+*.env
+*.json
+*.Python
+*.log
+*.rdb
+*.dump
+*.conf
+*.pth
