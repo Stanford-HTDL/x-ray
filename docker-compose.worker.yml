@@ -2,25 +2,25 @@ name: worker-config
 
 services:
 
-  # rabbitmq:
-  #   hostname: rabbitmq
-  #   image: rabbitmq:latest
-  #   restart: always
-  #   volumes:
-  #     - "./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf"
-  #   ports:
-  #     - "5672:5672"
-  #   networks:
-  #     - bridge-net
+  rabbitmq:
+    hostname: rabbitmq
+    image: rabbitmq:latest
+    restart: always
+    volumes:
+      - "./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf"
+    ports:
+      - "5672:5672"
+    networks:
+      - bridge-net
 
-  # redis:
-  #   hostname: redis
-  #   image: redis:latest
-  #   restart: always
-  #   ports:
-  #     - "6379:6379"
-  #   networks:
-  #     - bridge-net
+  redis:
+    hostname: redis
+    image: redis:latest
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - bridge-net
 
   worker:
     build:
@@ -68,16 +68,16 @@ services:
       - MIN_SIZE=${MIN_SIZE}
       - MAX_SIZE=${MAX_SIZE}
       - PLANET_API_KEY=${PLANET_API_KEY}
-    # depends_on:
-    #   - rabbitmq
-    #   - redis
+    depends_on:
+      - rabbitmq
+      - redis
     networks:
       - bridge-net
 
 networks:
-  # bridge-net:
-  #   name: bridge_net
-  #   driver: bridge
   bridge-net:
-    name: bridge_net  
-    external: true
+    name: bridge_net
+    driver: bridge
+  # bridge-net:
+  #   name: bridge_net  
+  #   external: true

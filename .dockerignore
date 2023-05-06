@@ -6,7 +6,6 @@ logs/
 env*/
 
 *.env
-*.json
 *.Python
 *.log
 *.rdb
