@@ -72,12 +72,13 @@ services:
     #   - rabbitmq
     #   - redis
     networks:
-      - bridge-net
+      # - bridge-net
+      - traefik-public
 
 networks:
   # bridge-net:
   #   name: bridge_net
   #   driver: bridge
-  bridge-net:
-    name: bridge_net  
+  traefik-public:
+    name: traefik_public
     external: true
