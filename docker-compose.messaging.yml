@@ -11,7 +11,8 @@ services:
     ports:
       - "5672:5672"
     networks:
-      - bridge-net
+      - traefik-public
+      # - bridge-net
 
   redis:
     hostname: redis
@@ -20,9 +21,14 @@ services:
     ports:
       - "6379:6379"
     networks:
-      - bridge-net
+      - traefik-public
+      # - bridge-net
 
 networks:
-  bridge-net:
-    name: bridge_net
+  traefik-public:
+    name: traefik_public
     external: true
+
+  # bridge-net:
+  #   name: bridge_net
+  #   external: true

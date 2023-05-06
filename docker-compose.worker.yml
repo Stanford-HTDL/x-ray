@@ -2,26 +2,6 @@ name: worker-config
 
 services:
 
-  # rabbitmq:
-  #   hostname: rabbitmq
-  #   image: rabbitmq:latest
-  #   restart: always
-  #   volumes:
-  #     - "./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf"
-  #   ports:
-  #     - "5672:5672"
-  #   networks:
-  #     - bridge-net
-
-  # redis:
-  #   hostname: redis
-  #   image: redis:latest
-  #   restart: always
-  #   ports:
-  #     - "6379:6379"
-  #   networks:
-  #     - bridge-net
-
   worker:
     build:
       context: .
@@ -72,9 +52,14 @@ services:
     #   - rabbitmq
     #   - redis
     networks:
-      - bridge-net
+      - traefik-public
+      # - bridge-net
 
 networks:
-  bridge-net:
-    name: bridge_net
+  traefik-public:
+    name: traefik_public
     external: true
+
+  # bridge-net:
+  #   name: bridge_net
+  #   external: true
