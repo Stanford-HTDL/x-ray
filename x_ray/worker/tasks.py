@@ -1,25 +1,20 @@
 __author__ = "Richard Correro (richard@richardcorrero.com)"
 
 import io
-import logging
 import os
-import time
 from datetime import datetime
-from typing import List
 
 import torch
 from google.cloud import storage
 
 from ..celery_config.celery import celery_app
 from ..inference.load_model_from_file import get_device, load_model
-from ..inference.pred_processors import ObjectDetectorProcessor, Processor
-from ..inference.script_utils import get_args
+from ..inference.pred_processors import Processor
+from ..inference.predict import predict, prep_for_prediction
 from ..utils import (blob_exists, get_datetime, get_signed_url, hash_string,
                      upload_file_to_gcs, zip_directory_as_bytes)
 
 torch.set_num_threads(1)
-
-SCRIPT_PATH = "analyze"
 
 # IDS_PATH: str = os.environ["IDS_PATH"]
 MODEL_NAME: str = os.environ["MODEL_NAME"]
@@ -44,72 +39,6 @@ MODEL: torch.nn.Module = load_model(
 
 CLIENT: storage.Client = storage.Client.from_service_account_json(GCS_CREDS_PATH)
 
-PRED_PROCESSORS = {
-    ObjectDetectorProcessor.__name__: ObjectDetectorProcessor
-}
-
-
-def prep_for_prediction(
-    model: torch.nn.Module, id: str, save_dir_path: str, device: torch.device,
-    pred_processor_name: str
-) -> Processor:
-    time_str = time.strftime("%Y%m%d_%H%M%S", time.gmtime())    
-    os.makedirs(save_dir_path, exist_ok=True)             
-    log_dir = os.path.join(save_dir_path, 'logs/').replace("\\", "/")
-    os.makedirs(log_dir, exist_ok=True)
-    log_filepath = os.path.join(
-        log_dir, f"{id}.log"
-    ).replace('\\', '/')
-
-    # pred_processor_name: str = args["pred_processor"]
-    pred_processor: Processor = PRED_PROCESSORS[pred_processor_name](save_dir=save_dir_path)
-
-    # Note: You CANNOT place a `logging.info(...)` command before calling `get_args(...)`
-    get_args(
-        script_path=SCRIPT_PATH, log_filepath=log_filepath, 
-        **model.args, **pred_processor.args, 
-        id=id, time=time_str
-    )
-
-    logging.info(f'Using device {device}')
-
-    return pred_processor
-
-
-def predict(
-    model: torch.nn.Module, device: torch.device, target_geojson_strs: List[str],
-    start: str, stop: str,
-    pred_processor: Processor
-) -> None:
-    samples = pred_processor.make_samples(target_geojson_strs=target_geojson_strs, start=start, end=stop)
-    # model_num_channels: int = model.args["num_channels"]
-    model.eval()
-    sample_idx: int = 0
-    for sample in samples:
-        sample_idx += 1
-        X: torch.Tensor = sample["X"]
-        X: torch.Tensor = X.to(device=device, dtype=torch.float32)
-        # X_num_channels = X.shape[channel_axis]
-        # assert X_num_channels == model_num_channels, \
-        #     f"Network has been defined with {model_num_channels}" \
-        #     f"input channels, but loaded images have {X_num_channels}" \
-        #     "channels. Please check that the images are loaded correctly."        
-        logging.info(f"Generating predictions for sample {sample_idx}...")
-        with torch.no_grad():
-            pred = model(X)
-        logging.info(f"Saving predictions for sample {sample_idx}...")
-        pred_processor.save_results(input=sample, output=pred)
-        # save_preds(input=sample, output=pred)    
-    logging.info(
-        """
-                ================
-                =              =
-                =     Done.    =
-                =              =
-                ================
-        """
-    )
-
 
 @celery_app.task(name="analyze")
 def analyze(
@@ -124,7 +53,7 @@ def analyze(
     geojson_hash: str = hash_string(target_geojson)
 
     save_dir_path: str = \
-        f"{MODEL_UID}/results/{geojson_hash}/{start_formatted}/{stop_formatted}"
+        f"results/{MODEL_UID}/{geojson_hash}/{start_formatted}/{stop_formatted}"
     
     results_blob_name: str = f"{save_dir_path}/results.zip"
 

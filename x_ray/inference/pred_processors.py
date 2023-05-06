@@ -104,11 +104,11 @@ class TimeSeriesProcessor(Processor):
             yield tile     
   
 
-    def _get_mosaic_time_str_from_start_end(self, start: str, end: str) -> OrderedDict:
+    def _get_mosaic_time_str_from_start_end(self, start: str, end: str) -> List[str]:
         dates = [start, end]
         start, end = [datetime.datetime.strptime(_, "%Y_%m") for _ in dates]
-        return OrderedDict(((start + datetime.timedelta(_)).strftime(r"%Y_%m"), None) \
-            for _ in range((end - start).days)).keys()
+        return list(OrderedDict(((start + datetime.timedelta(_)).strftime(r"%Y_%m"), None) \
+            for _ in range((end - start).days)).keys())
 
 
     def _make_papi_time_series_requests(
@@ -125,13 +125,14 @@ class TimeSeriesProcessor(Processor):
             x = tile.x
             y = tile.y            
             request_urls = list()
-            for year_month in self._get_mosaic_time_str_from_start_end(start, end):
+            dates: List[str] = self._get_mosaic_time_str_from_start_end(start, end)
+            for year_month in dates:
                 request_url = \
                     f"https://tiles.planet.com/basemaps/v1/planet-tiles/global_monthly_{year_month}_mosaic/gmap/{z}/{x}/{y}.png?api_key={self.planet_api_key}"
                 if false_color_index:
                     request_url += f"&proc={false_color_index}"
                 request_urls.append(request_url)
-            yield request_urls, z, x, y, geojson_name
+            yield request_urls, z, x, y, geojson_name, dates
 
 
     def _make_planet_monthly_time_series_requests(
@@ -148,7 +149,8 @@ class TimeSeriesProcessor(Processor):
 
 
     async def _post_monthly_mosaic_request(
-        self, request_urls: List[str], z: int, x: int, y: int, geojson_name: str
+        self, request_urls: List[str], z: int, x: int, y: int, geojson_name: str,
+        dates: List[str]
     ):
         responses = list()
         async with aiohttp.ClientSession() as session:
@@ -157,18 +159,19 @@ class TimeSeriesProcessor(Processor):
                     response.raise_for_status()
                     content = await response.read()
                     responses.append(content)
-        return responses, z, x, y, geojson_name
+        return responses, z, x, y, geojson_name, dates
 
 
     def _get_pil_images_from_response(
-        self, responses: List[bytes], z: int, x: int, y: int, geojson_name: str
+        self, responses: List[bytes], z: int, x: int, y: int, geojson_name: str,
+        dates: List[str]
     ) -> List[Image.Image]:
         images: list = list()
         for response in responses:
             img_bs = io.BytesIO(response)
             img = Image.open(img_bs).convert('RGB')
             images.append(img)
-        return images, z, x, y, geojson_name
+        return images, z, x, y, geojson_name, dates
 
 
     def get_planet_monthly_time_series_as_PIL_Images(
@@ -399,12 +402,12 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
 
     def _save_pil_images(
         self, images: List[Image.Image], z: int, x: int, y: int, target_name: str,
-        start, end, duration, save_dir: str, make_gifs: Optional[bool] = False,
+        dates: List[str], start, end, duration, save_dir: str, make_gifs: Optional[bool] = False,
         save_images: Optional[bool] = True, embed_date = True, 
         timelapse_format: Optional[str] = "gif", image_format: Optional[str] = "png",
         loop: Optional[int] = 0, tile_dir: Optional[str] = "xyz_tiles"
     ) -> Generator:
-        dates = self._get_mosaic_time_str_from_start_end(start, end)
+        # dates = self._get_mosaic_time_str_from_start_end(start, end)
         if embed_date:
             for date, image in list(zip(dates, images)):
                 year, month = date.split("_")
@@ -427,7 +430,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
                 image_filepath = os.path.join(save_dir, tile_dir, f"{image_format}s", image_filename).replace("\\", "/")
                 os.makedirs(os.path.dirname(image_filepath), exist_ok=True)
                 image.save(fp=image_filepath, format=image_format)
-        return images, z, x, y, target_name
+        return images, z, x, y, target_name, dates
 
 
     def make_sample(self, images: List[Image.Image], *args) -> dict:
@@ -572,7 +575,9 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
                 embed_date=self.embed_date, parallelizer=parallelizer
             )
 
-        data >> Transformer(tuple_to_args(self.make_sample), parallelizer=parallelizer)
+        data >> Transformer(
+            tuple_to_args(self.make_sample), parallelizer=parallelizer
+        )
 
         yield from data    
 
@@ -664,6 +669,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
         y: int = input["args"][2]
         geojson_name: str = input["args"][3]
 
+
         tile: Tile = Tile(x=x, y=y, z=z)
         # ul: LngLat = ul(tile)
         # lng = ul.lng
@@ -712,7 +718,10 @@ class ResNetProcessor(ConvLSTMCProcessor):
 
 
     def make_sample(self, images: List[Image.Image], *args) -> dict:
-        for image in images:
+        dates: List[str] = args[-1]
+        # dates: List[str] = list(dates.values())
+        assert isinstance(dates, list)
+        for image, date in list(zip(images, dates)):
             image: torch.Tensor = self.TRANSORMS(image)
             image: torch.Tensor = image.float().contiguous()
             image: torch.Tensor = image.unsqueeze(0)
@@ -720,6 +729,7 @@ class ResNetProcessor(ConvLSTMCProcessor):
             yield {
                 'X': image,
                 'Y': None,
+                "date": date,
                 "args": args
             }
 
@@ -729,7 +739,7 @@ class ObjectDetectorProcessor(ResNetProcessor):
 
     LOCAL_PRED_CSV_HEADER = ["Directory", "Boxes", "Labels", "Scores"]
     PAPI_PRED_CSV_HEADER = [
-        "Z", "X", "Y", "West", "South", "East", "North", "Geojson Name", "Boxes", "Labels", "Scores"
+        "Z", "X", "Y", "Date", "West", "South", "East", "North", "Geojson Name", "Boxes", "Labels", "Scores"
     ]
     INPUT_SIZE = (224,224)    
     TRANSORMS = T.Compose([
@@ -778,6 +788,7 @@ class ObjectDetectorProcessor(ResNetProcessor):
         x: int = input["args"][1]
         y: int = input["args"][2]
         geojson_name: str = input["args"][3]
+        date: str = input["date"]
 
         tile: Tile = Tile(x=x, y=y, z=z)
         # ul: LngLat = ul(tile)
@@ -794,13 +805,14 @@ class ObjectDetectorProcessor(ResNetProcessor):
         logging.info(
             f"""
                     Z/X/Y: {z}/{x}/{y}
+                    Date: {date}
                     Geojson Name: {geojson_name}
                     Boxes: {result["boxes"]}
                     Labels: {result["labels"]}
                     Scores: {result["scores"]}
             """
         )
-        results_list: list = [z, x, y, west, south, east, north, geojson_name, result["boxes"], result["labels"], result["scores"]]
+        results_list: list = [z, x, y, date, west, south, east, north, geojson_name, result["boxes"], result["labels"], result["scores"]]
         if self.save_manifest:
             with open(self.pred_manifest_path, "a", newline="") as f:
                 writer = csv.writer(f)
@@ -826,7 +838,7 @@ class ObjectDetectorProcessor(ResNetProcessor):
                     bbox_uid: int = self.BBOX_UID_DICT[zxy_str]
                     
                     bbox_geojson: dict = bbox_to_geojson(bbox, lng_lat_bbox, self.INPUT_SIZE)
-                    bbox_savepath: str = os.path.join(bbox_save_dir, f"{zxy_str}_bbox_{bbox_uid}.geojson").replace("\\", "/")
+                    bbox_savepath: str = os.path.join(bbox_save_dir, f"{zxy_str}_{date}_bbox_{bbox_uid}.geojson").replace("\\", "/")
                     with open(bbox_savepath, "w") as f:
                         json.dump(bbox_geojson, f)
             
