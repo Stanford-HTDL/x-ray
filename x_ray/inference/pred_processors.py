@@ -212,7 +212,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
     DEFAULT_TARGET_VALUE: int = 1
     DEFAULT_TARGET_COLUMN_NAME: str = "Predicted Class"
     DEFAULT_COORDINATE_COLUMN_NAMES: List[str] = ["Z", "X", "Y"]
-    DEFAULT_BBOX_THRESHOLD: float = 1e-2
+    # DEFAULT_BBOX_THRESHOLD: float = 1e-2
 
     NUM_TILES_PER_SUBLIST = 16
     INPUT_SIZE = (224,224)
@@ -231,6 +231,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
     DEFAULT_ZOOMS = [15]
     DEFAULT_DURATION = 250.0
     DEFAULT_SAVE_IMAGES = True
+    DEFAULT_SAVE_POSITIVE_IMAGES = False
     DEFAULT_EMBED_DATE = True
     DEFAULT_MAKE_GIFS = True
 
@@ -243,7 +244,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
     ]    
 
 
-    def __init__(self, save_dir: str):
+    def __init__(self, save_dir: str, bbox_threshold: float):
         args = self.parse_args()
         save_manifest: bool = args["save_manifest"]
         from_local_files = args["from_local_files"]
@@ -269,7 +270,10 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
                     writer.writerow(self.PAPI_PRED_CSV_HEADER)   
 
             self.pred_manifest_path = pred_manifest_path
+
         self.save_dir = save_dir
+        self.bbox_threshold = bbox_threshold
+
         self.save_manifest = save_manifest
         self.from_local_files = from_local_files
         self.planet_api_key = args["planet_api_key"]
@@ -285,10 +289,11 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
         self.target_value = int(args["target_value"])
         self.target_column_name = args["target_column_name"]
         self.coordinate_column_names = args["coordinate_column_names"]
-        self.bbox_threshold = float(args["bbox_threshold"])
+        # self.bbox_threshold = float(args["bbox_threshold"])
 
         self.embed_date = args["embed_date"]
         self.save_images = args["save_images"]
+        self.save_positive_images = args["save_positive_images"]
         self.make_gifs = args["make_gifs"]
         self.args = args
 
@@ -338,6 +343,10 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "SAVE_IMAGES",
             default=self.DEFAULT_SAVE_IMAGES
         ))
+        SAVE_POSITIVE_IMAGES: bool = arg_is_true(get_env_var_with_default(
+            "SAVE_POSITIVE_IMAGES",
+            default=self.DEFAULT_SAVE_POSITIVE_IMAGES
+        ))
         EMBED_DATE: bool = arg_is_true(get_env_var_with_default(
             "EMBED_DATE",
             default=self.DEFAULT_EMBED_DATE,
@@ -370,10 +379,10 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "COORDINATE",
             default=self.DEFAULT_COORDINATE_COLUMN_NAMES,
         )
-        BBOX_THRESHOLD: float = float(get_env_var_with_default(
-            "BBOX_THRESHOLD",
-            default=self.DEFAULT_BBOX_THRESHOLD,
-        ))
+        # BBOX_THRESHOLD: float = float(get_env_var_with_default(
+        #     "BBOX_THRESHOLD",
+        #     default=self.DEFAULT_BBOX_THRESHOLD,
+        # ))
         args: dict = {
             "pred_manifest": PRED_MANIFEST,
             "bbox_geojson_dir": BBOX_GEOJSON_DIR,
@@ -387,6 +396,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "duration": DURATION,
             "fc_index": FC_INDEX,
             "save_images": SAVE_IMAGES,
+            "save_positive_images": SAVE_POSITIVE_IMAGES,
             "embed_date": EMBED_DATE,
             "make_gifs": MAKE_GIFS,
             "from_preds_csv": FROM_PREDS_CSV,
@@ -395,14 +405,15 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
             "target_value": TARGET_VALUE,
             "target_column_name": TARGET_COLUMN_NAME,
             "coordinate_column_names": COORDINATE_COLUMN_NAMES,
-            "bbox_threshold": BBOX_THRESHOLD
+            # "bbox_threshold": BBOX_THRESHOLD
         }
         return args                    
 
 
     def _save_pil_images(
         self, images: List[Image.Image], z: int, x: int, y: int, target_name: str,
-        dates: List[str], start, end, duration, save_dir: str, make_gifs: Optional[bool] = False,
+        dates: List[str], start, end, duration: Optional[float] = 250.0, 
+        save_dir: Optional[str] = "/images", make_gifs: Optional[bool] = False,
         save_images: Optional[bool] = True, embed_date = True, 
         timelapse_format: Optional[str] = "gif", image_format: Optional[str] = "png",
         loop: Optional[int] = 0, tile_dir: Optional[str] = "xyz_tiles"
@@ -721,7 +732,9 @@ class ResNetProcessor(ConvLSTMCProcessor):
         dates: List[str] = args[-1]
         # dates: List[str] = list(dates.values())
         assert isinstance(dates, list)
+        # original_images: List[Image.Image] = images
         for image, date in list(zip(images, dates)):
+            original_image: Image.Image = image
             image: torch.Tensor = self.TRANSORMS(image)
             image: torch.Tensor = image.float().contiguous()
             image: torch.Tensor = image.unsqueeze(0)
@@ -730,6 +743,7 @@ class ResNetProcessor(ConvLSTMCProcessor):
                 'X': image,
                 'Y': None,
                 "date": date,
+                "original_image": original_image,
                 "args": args
             }
 
@@ -841,4 +855,15 @@ class ObjectDetectorProcessor(ResNetProcessor):
                     bbox_savepath: str = os.path.join(bbox_save_dir, f"{zxy_str}_{date}_bbox_{bbox_uid}.geojson").replace("\\", "/")
                     with open(bbox_savepath, "w") as f:
                         json.dump(bbox_geojson, f)
+
+        # Save image if there is at least one positive bbox
+        if self.save_positive_images and len(bboxes_to_save) > 0:
+            logging.info(f"Saving image for location {z}/{x}/{y} on date {date}...")
+            image: Image.Image = input["original_image"]
+            self._save_pil_images(
+                images=[image], z=z, x=x,y=y, target_name=geojson_name, 
+                dates=[date], start=date, end=date, save_dir=self.save_dir, 
+                make_gifs=False, save_images=True, embed_date=self.embed_date,
+            )
+        
             

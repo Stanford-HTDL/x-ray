@@ -2,6 +2,7 @@ __author__ = "Richard Correro (richard@richardcorrero.com)"
 
 import io
 import os
+import shutil
 from datetime import datetime
 
 import torch
@@ -42,7 +43,7 @@ CLIENT: storage.Client = storage.Client.from_service_account_json(GCS_CREDS_PATH
 
 @celery_app.task(name="analyze")
 def analyze(
-    start: str, stop: str, target_geojson: str, process_uid: str
+    start: str, stop: str, target_geojson: str, process_uid: str, bbox_threshold: float
 ) -> dict:
     start_datetime: datetime = get_datetime(start)
     start_formatted: str = start_datetime.strftime('%Y_%m')
@@ -65,7 +66,8 @@ def analyze(
     ):
         pred_processor: Processor = prep_for_prediction(
             model=MODEL, id=process_uid, save_dir_path=save_dir_path, 
-            device=DEVICE, pred_processor_name=PRED_PROCESSOR
+            device=DEVICE, pred_processor_name=PRED_PROCESSOR, 
+            bbox_threshold=bbox_threshold
         )
         predict(model=MODEL, device=DEVICE, target_geojson_strs=[target_geojson], 
             pred_processor=pred_processor, start=start_formatted, stop=stop_formatted
@@ -75,6 +77,9 @@ def analyze(
             zip_file_data=zip_file_data, blob_name=results_blob_name, 
             client=CLIENT, bucket_name=BUCKET_NAME, content_type=OUTPUT_FILE_TYPE
         )
+        # Remove directory from local storage
+        shutil.rmtree(save_dir_path)
+
     signed_url: str = get_signed_url(
         blob_name=results_blob_name, client=CLIENT, bucket_name=BUCKET_NAME,
         exp_minutes=SIGNED_URL_EXPIRATION_MINUTES

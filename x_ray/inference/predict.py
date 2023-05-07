@@ -18,8 +18,8 @@ PRED_PROCESSORS = {
 
 
 def prep_for_prediction(
-    model: torch.nn.Module, id: str, save_dir_path: str, device: torch.device,
-    pred_processor_name: str
+    model: torch.nn.Module, id: str, save_dir_path: str, bbox_threshold: float, 
+    device: torch.device, pred_processor_name: str, 
 ) -> Processor:
     time_str = time.strftime("%Y%m%d_%H%M%S", time.gmtime())    
     os.makedirs(save_dir_path, exist_ok=True)             
@@ -30,7 +30,9 @@ def prep_for_prediction(
     ).replace('\\', '/')
 
     # pred_processor_name: str = args["pred_processor"]
-    pred_processor: Processor = PRED_PROCESSORS[pred_processor_name](save_dir=save_dir_path)
+    pred_processor: Processor = PRED_PROCESSORS[pred_processor_name](
+        save_dir=save_dir_path, bbox_threshold=bbox_threshold
+    )
 
     # Note: You CANNOT place a `logging.info(...)` command before calling `get_args(...)`
     get_args(
