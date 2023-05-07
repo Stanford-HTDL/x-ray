@@ -54,7 +54,7 @@ def analyze(
     geojson_hash: str = hash_string(target_geojson)
 
     save_dir_path: str = \
-        f"results/{MODEL_UID}/{geojson_hash}/{start_formatted}/{stop_formatted}"
+        f"results/{MODEL_UID}/{geojson_hash}/{start_formatted}/{stop_formatted}/bbox_threshold_{bbox_threshold:0.2f}"
     
     results_blob_name: str = f"{save_dir_path}/results.zip"
 
