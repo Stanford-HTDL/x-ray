@@ -155,10 +155,13 @@ class TimeSeriesProcessor(Processor):
         responses = list()
         async with aiohttp.ClientSession() as session:
             for request_url in request_urls:
-                async with session.get(request_url) as response:
-                    response.raise_for_status()
-                    content = await response.read()
-                    responses.append(content)
+                try:
+                    async with session.get(request_url) as response:
+                        response.raise_for_status()
+                        content = await response.read()
+                        responses.append(content)
+                except:
+                    logging.info(f"Error with request {request_url}. Response: {response}")
         return responses, z, x, y, geojson_name, dates
 
 
@@ -541,7 +544,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
 
 
     def _make_samples_from_planet_api(
-        self, geojson_dir_path: str | None, geojson_strs: List[str] | None, 
+        self, geojson_dir_path: Union[str, None], geojson_strs: Union[List[str], None], 
         start: str, end: str, zooms: List[int], 
         false_color_index: Optional[str] = None, truncate: Optional[bool] = True, 
         num_tiles_per_sublist: Optional[int] = 16,
@@ -563,6 +566,8 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
 
         tiles_list: List[Tile] = data(block=True)
         tiles_list = list(set(tiles_list)) # Remove duplicates
+
+        logging.info(f"Number of tiles to be analyzed: {len(tiles_list)}.")
         
         # Chunk tiles to prevent order bottlenecks (HTTP 503 errors)
         tiles_chunked = [
