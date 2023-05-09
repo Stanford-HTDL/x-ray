@@ -155,13 +155,13 @@ class TimeSeriesProcessor(Processor):
         responses = list()
         async with aiohttp.ClientSession() as session:
             for request_url in request_urls:
-                try:
-                    async with session.get(request_url) as response:
+                async with session.get(request_url) as response:
+                    try:
                         response.raise_for_status()
                         content = await response.read()
                         responses.append(content)
-                except:
-                    logging.info(f"Error with request {request_url}. Response: {response}")
+                    except:
+                        logging.info(f"Error with request {request_url}. Response: {response}. Skipping...")
         return responses, z, x, y, geojson_name, dates
 
 

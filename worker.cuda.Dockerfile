@@ -1,5 +1,4 @@
-FROM nvidia/cuda:11.3.1-devel-ubuntu20.04
-ENV TZ=Europe/Brussels
+FROM nvidia/cuda:11.6.0-devel-ubuntu20.04
 
 RUN apt-get update --fix-missing && DEBIAN_FRONTEND=noninteractive apt-get install --assume-yes --no-install-recommends \
    build-essential \
