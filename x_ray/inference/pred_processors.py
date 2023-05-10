@@ -150,18 +150,21 @@ class TimeSeriesProcessor(Processor):
 
     async def _post_monthly_mosaic_request(
         self, request_urls: List[str], z: int, x: int, y: int, geojson_name: str,
-        dates: List[str]
+        dates: List[str], num_retries: Optional[int] = 64
     ):
         responses = list()
         async with aiohttp.ClientSession() as session:
             for request_url in request_urls:
-                async with session.get(request_url) as response:
+                for _ in num_retries:
                     try:
-                        response.raise_for_status()
-                        content = await response.read()
-                        responses.append(content)
+                        async with session.get(request_url) as response:
+                            response.raise_for_status()
+                            content = await response.read()
+                            responses.append(content)
+                        break
                     except:
-                        logging.info(f"Error with request {request_url}. Response: {response}. Skipping...")
+                        pass
+                    logging.info(f"Error with request {request_url}. Retried {num_retries} times without success. Skipping...")
         return responses, z, x, y, geojson_name, dates
 
 
