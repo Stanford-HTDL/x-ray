@@ -7,7 +7,7 @@ import json
 import logging
 import os
 from collections import OrderedDict
-from typing import Dict, Generator, List, Optional, Union
+from typing import Generator, List, Optional, Tuple, Union
 
 import aiohttp
 import pandas as pd
@@ -19,7 +19,7 @@ from PIL import Image, ImageDraw
 from ..utils import get_env_var_with_default
 from .detection import bbox_to_geojson
 from .mercantile import LngLatBbox, Tile, bounds, geojson_bounds, tiles
-from .script_utils import async_tuple_to_args, tuple_to_args, arg_is_true
+from .script_utils import arg_is_true, async_tuple_to_args, tuple_to_args
 
 
 class Processor:
@@ -419,14 +419,26 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
         save_dir: Optional[str] = "/images", make_gifs: Optional[bool] = False,
         save_images: Optional[bool] = True, embed_date = True, 
         timelapse_format: Optional[str] = "gif", image_format: Optional[str] = "png",
-        loop: Optional[int] = 0, tile_dir: Optional[str] = "xyz_tiles"
+        loop: Optional[int] = 0, tile_dir: Optional[str] = "xyz_tiles",
+        draw_bounding_boxes: Optional[bool] = False, 
+        bounding_boxes: Optional[Union[List[List[List]], None]] = None,
+        bbox_outline_color="red"
     ) -> Generator:
         # dates = self._get_mosaic_time_str_from_start_end(start, end)
         if embed_date:
             for date, image in list(zip(dates, images)):
                 year, month = date.split("_")
                 draw = ImageDraw.Draw(image)
-                draw.text((0, 0), f"{year} {month} {z} {x} {y}",(255,255,255))                   
+                draw.text((0, 0), f"{year} {month} {z} {x} {y}",(255,255,255))
+
+        if draw_bounding_boxes:
+            assert bounding_boxes is not None, "bounding_boxes must be passed when draw_bounding_boxes=True."
+            for bbox_list, image in list(zip(bounding_boxes, images)):
+                draw = ImageDraw.Draw(image)
+                for bbox in bbox_list:
+                    rect: List[Tuple] = [(bbox[0], bbox[1]), (bbox[2], bbox[3])]
+                    draw.rectangle(rect, outline=bbox_outline_color)
+
 
         if make_gifs and len(images) > 1:
             gif_filename = f"{start}_{end}/{z}/{target_name}/{z}_{x}_{y}/{start}_{end}.{timelapse_format}"
@@ -865,10 +877,20 @@ class ObjectDetectorProcessor(ResNetProcessor):
         if self.save_positive_images and len(bboxes_to_save) > 0:
             logging.info(f"Saving image for location {z}/{x}/{y} on date {date}...")
             image: Image.Image = input["original_image"]
+            # Rescale bounding boxes to size of original image
+            image_y, image_x = image.size
+            y_scaler: float = image_y / self.INPUT_SIZE[0]
+            x_scaler: float = image_x / self.INPUT_SIZE[1]
+            for bbox in bboxes_to_save:
+                bbox[0] *= x_scaler
+                bbox[1] *= y_scaler
+                bbox[2] *= x_scaler
+                bbox[3] *= y_scaler
             self._save_pil_images(
                 images=[image], z=z, x=x,y=y, target_name=geojson_name, 
                 dates=[date], start=date, end=date, save_dir=self.save_dir, 
                 make_gifs=False, save_images=True, embed_date=self.embed_date,
+                draw_bounding_boxes=True, bounding_boxes=[bboxes_to_save]
             )
         
             
