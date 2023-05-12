@@ -155,7 +155,7 @@ class TimeSeriesProcessor(Processor):
         responses = list()
         async with aiohttp.ClientSession() as session:
             for request_url in request_urls:
-                for _ in num_retries:
+                for _ in range(num_retries):
                     try:
                         async with session.get(request_url) as response:
                             response.raise_for_status()
