@@ -78,7 +78,8 @@ def analyze(
             client=CLIENT, bucket_name=BUCKET_NAME, content_type=OUTPUT_FILE_TYPE
         )
         # Remove directory from local storage
-        shutil.rmtree(save_dir_path)
+        if os.path.exists(save_dir_path) and os.path.isdir(save_dir_path):
+            shutil.rmtree(save_dir_path)
 
     signed_url: str = get_signed_url(
         blob_name=results_blob_name, client=CLIENT, bucket_name=BUCKET_NAME,
