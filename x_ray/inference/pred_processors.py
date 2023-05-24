@@ -444,7 +444,8 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
 
 
         if make_gifs and len(images) > 1:
-            gif_filename = f"{start}_{end}/{z}/{target_name}/{z}_{x}_{y}/{start}_{end}.{timelapse_format}"
+            # gif_filename = f"{target_name}_{z}_{x}_{y}_{start}_{end}.{timelapse_format}"
+            gif_filename = f"{z}_{x}_{y}_{start}_{end}.{timelapse_format}"
             gif_filepath = os.path.join(save_dir, tile_dir, f"{timelapse_format}s", gif_filename).replace("\\", "/")
             os.makedirs(os.path.dirname(gif_filepath), exist_ok=True)
             imgs_iter = iter(images)
@@ -455,7 +456,8 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
 
         if save_images:
             for date, image in list(zip(dates, images)):
-                image_filename = f"{start}_{end}/{z}/{target_name}/{z}_{x}_{y}/{date}.{image_format}"
+                # image_filename = f"{target_name}_{start}_{end}_{z}_{x}_{y}_{date}.{image_format}"
+                image_filename = f"{z}_{x}_{y}_{date}.{image_format}"
                 image_filepath = os.path.join(save_dir, tile_dir, f"{image_format}s", image_filename).replace("\\", "/")
                 os.makedirs(os.path.dirname(image_filepath), exist_ok=True)
                 image.save(fp=image_filepath, format=image_format)
@@ -862,7 +864,8 @@ class ObjectDetectorProcessor(ResNetProcessor):
                     bboxes_to_save.append(bbox)
 
             if len(bboxes_to_save) > 0:
-                bbox_save_dir = os.path.join(self.bbox_geojson_dir, zxy_str).replace("\\", "/")
+                # bbox_save_dir = os.path.join(self.bbox_geojson_dir, zxy_str).replace("\\", "/")
+                bbox_save_dir = self.bbox_geojson_dir # Client doesn't like directories
                 os.makedirs(bbox_save_dir, exist_ok=True)
                 for bbox in bboxes_to_save:
                     if zxy_str in self.BBOX_UID_DICT:
