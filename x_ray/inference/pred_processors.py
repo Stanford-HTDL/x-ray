@@ -220,6 +220,8 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
     DEFAULT_COORDINATE_COLUMN_NAMES: List[str] = ["Z", "X", "Y"]
     # DEFAULT_BBOX_THRESHOLD: float = 1e-2
 
+    MAKE_SAMPLES: bool = True
+
     NUM_TILES_PER_SUBLIST = 16
     INPUT_SIZE = (224,224)
     TRANSORMS = T.Compose([
@@ -555,7 +557,8 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
                 embed_date=self.embed_date, parallelizer=parallelizer
             )
 
-        data >> Transformer(tuple_to_args(self.make_sample), parallelizer=parallelizer)
+        if self.MAKE_SAMPLES:
+            data >> Transformer(tuple_to_args(self.make_sample), parallelizer=parallelizer)
 
         yield from data           
 
@@ -584,7 +587,7 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
         tiles_list: List[Tile] = data(block=True)
         tiles_list = list(set(tiles_list)) # Remove duplicates
 
-        logging.info(f"Number of tiles to be analyzed: {len(tiles_list)}.")
+        logging.info(f"Number of unique xyz tiles to be analyzed: {len(tiles_list)}.")
         
         # Chunk tiles to prevent order bottlenecks (HTTP 503 errors)
         tiles_chunked = [
@@ -608,9 +611,10 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
                 embed_date=self.embed_date, parallelizer=parallelizer
             )
 
-        data >> Transformer(
-            tuple_to_args(self.make_sample), parallelizer=parallelizer
-        )
+        if self.MAKE_SAMPLES:
+            data >> Transformer(
+                tuple_to_args(self.make_sample), parallelizer=parallelizer
+            )
 
         yield from data    
 
@@ -625,10 +629,12 @@ class ConvLSTMCProcessor(TimeSeriesProcessor):
              >> Transformer(
                 tuple_to_args(self.read_files_as_pil_image), return_filepaths=True,
                 parallelizer=parallelizer
-             ) \
-             >> Transformer(
-                tuple_to_args(self.make_sample), parallelizer=parallelizer
              )
+        
+        if self.MAKE_SAMPLES:
+            data >> Transformer(
+                tuple_to_args(self.make_sample), parallelizer=parallelizer
+            )
         yield from data
 
 
@@ -816,10 +822,12 @@ class ObjectDetectorProcessor(ResNetProcessor):
         if self.save_manifest:
             with open(self.pred_manifest_path, "a", newline="") as f:
                 writer = csv.writer(f)
-                writer.writerow(results_list)      
+                writer.writerow(results_list)
 
 
-    def _save_results_from_planet_api(self, input: dict, output: torch.Tensor) -> None:
+    def _save_results_from_planet_api(
+        self, input: dict, output: torch.Tensor
+    ) -> None:
         z: int = input["args"][0]
         x: int = input["args"][1]
         y: int = input["args"][2]
@@ -898,5 +906,62 @@ class ObjectDetectorProcessor(ResNetProcessor):
                 make_gifs=False, save_images=True, embed_date=self.embed_date,
                 draw_bounding_boxes=True, bounding_boxes=[bboxes_to_save]
             )
-        
+
+
+class PlanetMediaMaker(ObjectDetectorProcessor):
+    __name__ = "PlanetMediaMaker"
+
+    MAKE_SAMPLES: bool = False
+
+    def __init__(self, save_dir: str):
+        args = self.parse_args()
+        save_manifest: bool = args["save_manifest"]
+        from_local_files = args["from_local_files"]
+        save_geojson: bool = args["save_geojson"]
+        self.save_geojson = save_geojson
+        if save_geojson:
+            bbox_geojson_dir = args["bbox_geojson_dir"]
+            bbox_geojson_dir = os.path.join(save_dir, bbox_geojson_dir).replace("\\", "/")
+            os.makedirs(bbox_geojson_dir, exist_ok=True)
+            self.bbox_geojson_dir = bbox_geojson_dir 
+        if save_manifest:
+            pred_manifest: str = args["pred_manifest"]
+            pred_manifest_path: str = os.path.join(save_dir, pred_manifest).replace("\\", "/")
+            # os.makedirs(os.path.dirname(pred_manifest_path), exist_ok=True)
+
+            if from_local_files:
+                with open(pred_manifest_path, "w", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(self.LOCAL_PRED_CSV_HEADER)                
+            else:
+                with open(pred_manifest_path, "w", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(self.PAPI_PRED_CSV_HEADER)   
+
+            self.pred_manifest_path = pred_manifest_path
+
+        self.save_dir = save_dir
+
+        self.save_manifest = save_manifest
+        self.from_local_files = from_local_files
+        self.planet_api_key = args["planet_api_key"]
+        self.start = args["start"]
+        self.end = args["end"]
+        self.zooms = args["zooms"]
+        self.duration = args["duration"]
+        self.fc_index = args["fc_index"]
+
+        self.from_preds_csv = args["from_preds_csv"]
+        self.preds_csv_path = args["preds_csv_path"]
+        self.filter_by_target_value = args["filter_by_target_value"]
+        self.target_value = int(args["target_value"])
+        self.target_column_name = args["target_column_name"]
+        self.coordinate_column_names = args["coordinate_column_names"]
+        # self.bbox_threshold = float(args["bbox_threshold"])
+
+        self.embed_date = True
+        self.save_images = True
+        self.save_positive_images = args["save_positive_images"]
+        self.make_gifs = True
+        self.args = args
             
