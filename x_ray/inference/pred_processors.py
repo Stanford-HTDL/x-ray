@@ -915,7 +915,7 @@ class PlanetMediaMaker(ObjectDetectorProcessor):
 
     def __init__(self, save_dir: str):
         args = self.parse_args()
-        save_manifest: bool = args["save_manifest"]
+        save_manifest: bool = False
         from_local_files = args["from_local_files"]
         save_geojson: bool = args["save_geojson"]
         self.save_geojson = save_geojson
