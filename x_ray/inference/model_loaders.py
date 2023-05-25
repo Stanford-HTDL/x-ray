@@ -9,10 +9,9 @@ from torchvision._internally_replaced_utils import load_state_dict_from_url
 from torchvision.models import detection
 from torchvision.models.detection._utils import overwrite_eps
 from torchvision.models.detection.backbone_utils import (
-    _resnet_fpn_extractor, _validate_trainable_layers, resnet_fpn_backbone)
+    _resnet_fpn_extractor, _validate_trainable_layers)
 from torchvision.models.detection.faster_rcnn import model_urls
 from torchvision.ops import misc as misc_nn_ops
-
 
 BACKBONES = {
     "resnet18": models.resnet18,
