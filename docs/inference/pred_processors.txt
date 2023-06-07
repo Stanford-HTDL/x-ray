@@ -1,0 +1,82 @@
+Module: pred_processors.py
+
+__author__ = "Richard Correro (richard@richardcorrero.com)"
+
+Classes:
+- Processor
+- TimeSeriesProcessor
+- ConvLSTMCProcessor
+
+Functions:
+- None
+
+Constants:
+- None
+
+Class: Processor
+
+This class represents a processor that performs various operations on filenames, directories, and files.
+
+Methods:
+- sort_filenames(self, filenames: List[str]) -> List[str]:
+    Sorts a list of filenames in ascending order and returns the sorted list.
+
+- walk_dir(self, dir_path: str, sort_filenames: Optional[bool] = True) -> Generator:
+    Iterates over the directories and files in the specified directory path using os.walk().
+    Yields tuples containing the directory path and the list of filenames.
+    If sort_filenames is True, the filenames are sorted using the sort_filenames() method before yielding.
+
+- str_to_dict(self, dict_strs: List[str]) -> Generator:
+    Converts a list of JSON string representations of dictionaries into actual dictionaries using json.loads().
+    Yields the resulting dictionaries.
+
+- get_filepaths(
+    self, dirpath: str, filenames: List[str], as_list: Optional[bool] = False
+) -> Generator:
+    Generates filepaths by joining the specified directory path with each filename in the given list.
+    Yields each filepath.
+    If as_list is True, all filepaths are collected in a list and yielded at the end.
+
+- read_file_as_pil_image(self, filepath: str) -> Image:
+    Reads an image file from the specified filepath using PIL (Python Imaging Library) and converts it to the RGB mode.
+    Returns the resulting PIL image.
+
+- read_files_as_pil_image(
+    self, filepaths: List[str], return_filepaths: Optional[bool] = False
+) -> List[Image.Image]:
+    Reads multiple image files from the given list of filepaths using the read_file_as_pil_image() method.
+    Returns a list of PIL images.
+    If return_filepaths is True, the list of filepaths is also returned alongside the list of images.
+
+Properties:
+- __name__:
+    The name of the Processor class.
+
+Class: TimeSeriesProcessor
+
+This class extends the Processor class and adds additional functionality for processing time series data.
+
+Methods:
+- _open_geojson(self, geojson_path: str) -> dict:
+    Opens and reads a geojson file from the specified file path and returns the parsed JSON content as a dictionary.
+
+- _get_tiles(self, geojson: dict, zooms: List[str], truncate: bool) -> Generator:
+    Extracts tile information from the provided geojson dictionary and generates Tile objects for each tile within the specified zoom levels.
+    Yields each Tile object.
+
+- _get_mosaic_time_str_from_start_end(self, start: str, end: str) -> List[str]:
+    Generates a list of mosaic time strings (formatted as "YYYY_MM") based on the provided start and end date strings.
+    Returns the list of time strings.
+
+- _make_papi_time_series_requests(
+    self, tiles_list: List[int], geojson_name: str, start: str, end: str, 
+    false_color_index: str
+) -> Generator:
+    Constructs requests for Planet API time series data retrieval based on the provided parameters.
+    Yields a tuple containing the request URLs, tile information, geojson name, and dates.
+
+- _make_planet_monthly_time_series_requests(
+    self, tiles_list: List[Tile], geojson_name: str, start: str, 
+    end: str, false_color_index: Optional[str] = None
+) -> Generator:
+    Generates time series requests for monthly mosaic data from the Planet API based on the provided tiles and other parameters.

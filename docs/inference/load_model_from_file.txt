@@ -1,0 +1,26 @@
+Module Documentation: load_model_from_file.py
+
+This module provides functions for loading and using pre-trained models for inference.
+
+Author:
+- Richard Correro (richard@richardcorrero.com)
+
+Global Variables:
+- MODELS (dict): A dictionary mapping model names to their corresponding model classes.
+
+Functions:
+- get_device(device: str) -> torch.device:
+  - Get the torch device based on the specified device string.
+  - Parameters:
+    - device (str): The device string specifying the desired device ("CUDA if available else CPU", "CUDA", or "CPU").
+  - Returns:
+    - torch.device: The torch device object.
+
+- load_model(model_name: str, model_filepath: str, device: torch.device) -> torch.nn.Module:
+  - Load a pre-trained model from a file.
+  - Parameters:
+    - model_name (str): The name of the model to load.
+    - model_filepath (str): The file path to the saved model.
+    - device (torch.device): The torch device to load the model onto.
+  - Returns:
+    - torch.nn.Module: The loaded pre-trained model.

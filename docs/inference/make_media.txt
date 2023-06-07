@@ -1,0 +1,34 @@
+Module Documentation: make_media.py
+
+This module provides functions for preparing and generating media samples based on target geojsons.
+
+Author:
+- Richard Correro (richard@richardcorrero.com)
+
+Global Variables:
+- SCRIPT_PATH (str): The path of the script.
+- PRED_PROCESSORS (dict): A dictionary mapping prediction processor names to their corresponding processor classes.
+
+Functions:
+- prep_for_media(
+    id: str, save_dir_path: str, pred_processor_name: str
+) -> Processor:
+  - Prepare the necessary directories and logging for media generation.
+  - Parameters:
+    - id (str): The identifier for the media generation process.
+    - save_dir_path (str): The directory path to save the media files.
+    - pred_processor_name (str): The name of the prediction processor to use.
+  - Returns:
+    - Processor: The instantiated prediction processor.
+
+- make_media_samples(
+    target_geojson_strs: List[str], start: str, stop: str, pred_processor: Processor
+) -> None:
+  - Generate media samples based on the target geojsons.
+  - Parameters:
+    - target_geojson_strs (List[str]): The list of target geojson strings.
+    - start (str): The start time for media generation.
+    - stop (str): The stop time for media generation.
+    - pred_processor (Processor): The prediction processor object to use for media generation.
+  - Returns:
+    - None: This function does not return any value.

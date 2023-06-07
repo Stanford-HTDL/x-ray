@@ -1,0 +1,27 @@
+Module Documentation: fasterrcnn_resnet_fpn
+
+This module provides a function for constructing a Faster R-CNN model with a ResNet-FPN backbone using torchvision.
+
+Author: Richard Correro (richard@richardcorrero.com)
+
+Functions:
+
+1. `fasterrcnn_resnet_fpn(backbone_name, pretrained=False, progress=True, num_classes=2, pretrained_backbone=True, trainable_backbone_layers=None, **kwargs)`:
+
+   Constructs a Faster R-CNN model with a ResNet-FPN backbone.
+
+   **Parameters:**
+
+   - `backbone_name` (str): Name of the ResNet backbone to use.
+   - `pretrained` (bool): If True, returns a model pre-trained on COCO train2017. Default is False.
+   - `progress` (bool): If True, displays a progress bar of the download to stderr. Default is True.
+   - `num_classes` (int): Number of output classes of the model, including the background. Default is 2.
+   - `pretrained_backbone` (bool): If True, returns a model with the backbone pre-trained on Imagenet. Default is True.
+   - `trainable_backbone_layers` (int): Number of trainable (not frozen) ResNet layers starting from the final block. Valid values are between 0 and 5, with 5 meaning all backbone layers are trainable. If `None` is passed, the default value is set to 3.
+   - `**kwargs`: Additional keyword arguments to be passed to the `FasterRCNN` model.
+
+   **Returns:**
+
+   - `model` (FasterRCNN): The constructed Faster R-CNN model.
+
+Note: This is a brief summary of the `fasterrcnn_resnet_fpn` function provided in the code. For detailed information about the function and its usage, please refer to the function docstring and the associated comments in the code.

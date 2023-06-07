@@ -1,0 +1,66 @@
+Module Documentation: tasks.py
+
+This module contains tasks for analyzing and generating media based on target geojsons using a pre-trained model.
+
+Author:
+- Richard Correro (richard@richardcorrero.com)
+
+Functions:
+- analyze(
+    start: str, stop: str, target_geojsons: List[str], process_uid: str, bbox_threshold: float
+) -> dict:
+  - Analyze target geojsons within a specified time range.
+  - Parameters:
+    - start (str): The start time in the format "%Y_%m".
+    - stop (str): The stop time in the format "%Y_%m".
+    - target_geojsons (List[str]): The list of target geojsons.
+    - process_uid (str): The unique identifier for the analysis process.
+    - bbox_threshold (float): The bounding box threshold.
+  - Returns:
+    - dict: A dictionary containing the signed URL of the analysis results.
+
+- make_media(
+    start: str, stop: str, target_geojsons: List[str], process_uid: str
+) -> dict:
+  - Generate media based on target geojsons within a specified time range.
+  - Parameters:
+    - start (str): The start time in the format "%Y_%m".
+    - stop (str): The stop time in the format "%Y_%m".
+    - target_geojsons (List[str]): The list of target geojsons.
+    - process_uid (str): The unique identifier for the media generation process.
+  - Returns:
+    - dict: A dictionary containing the signed URL of the generated media.
+
+Global Variables:
+- MODEL_NAME (str): The name of the pre-trained model.
+- MODEL_PATH (str): The file path of the pre-trained model.
+- MODEL_UID (str): The unique identifier of the pre-trained model.
+- PRED_PROCESSOR (str): The name of the prediction processor.
+- MEDIA_MAKER (str): The name of the media maker.
+- DEVICE (str): The device to run the analysis on.
+- GCS_CREDS_PATH (str): The file path of the GCS credentials JSON file.
+- BUCKET_NAME (str): The name of the GCS bucket.
+- OUTPUT_FILE_TYPE (str): The content type of the output file.
+- SIGNED_URL_EXPIRATION_MINUTES (int): The expiration time of the signed URL in minutes.
+- CLIENT (storage.Client): The GCS client object.
+- MODEL (torch.nn.Module): The loaded pre-trained model.
+
+Dependencies:
+- io: Provides the BytesIO class for working with in-memory binary data.
+- json: Provides functions for working with JSON data.
+- os: Provides functions for interacting with the operating system.
+- shutil: Provides functions for file and directory operations.
+- datetime: Provides classes for manipulating dates and times.
+- typing: Provides support for type hints.
+- torch: The PyTorch library for deep learning.
+- google.cloud.storage: The Google Cloud Storage library for interacting with GCS.
+- ..celery_config.celery: The Celery configuration module.
+- ..inference.load_model_from_file: The module for loading models from file.
+- ..inference.pred_processors: The module for prediction processors.
+- ..inference.predict: The module for performing predictions.
+- ..inference.make_media: The module for generating media.
+- ..utils: The module containing utility functions.
+
+Note:
+- The module assumes that the required dependencies are installed and accessible.
+- Make sure to configure the necessary environment variables for proper execution.

@@ -1,0 +1,117 @@
+Module: predict.py
+
+__author__:
+    Richard Correro (richard@richardcorrero.com)
+
+Classes:
+    - ObjectDetectorProcessor
+    - Processor
+
+Functions:
+    - get_args
+    - prep_for_prediction
+    - predict
+
+Constants:
+    - SCRIPT_PATH
+    - PRED_PROCESSORS
+
+---
+
+ObjectDetectorProcessor:
+    A class representing an object detector processor.
+
+    Methods:
+        - make_samples(target_geojson_strs: List[str], start: str, end: str) -> List[Dict[str, Any]]:
+            Creates samples for prediction based on target GeoJSON strings and start/end times.
+
+        - save_results(input: Dict[str, Any], output: Any) -> None:
+            Saves the prediction results based on the input and output data.
+
+        - args: Dict[str, Any]
+            Arguments specific to the object detector processor.
+
+Processor:
+    A base class for processors.
+
+    Methods:
+        - make_samples(target_geojson_strs: List[str], start: str, end: str) -> List[Dict[str, Any]]:
+            Abstract method for creating samples for prediction.
+
+        - save_results(input: Dict[str, Any], output: Any) -> None:
+            Abstract method for saving prediction results.
+
+        - args: Dict[str, Any]
+            Arguments specific to the processor.
+
+get_args(script_path: str, log_filepath: str, **kwargs) -> None:
+    A function to retrieve arguments for the script.
+
+    Parameters:
+        - script_path: str
+            The script path.
+
+        - log_filepath: str
+            The log file path.
+
+        - kwargs: Any
+            Additional keyword arguments.
+
+prep_for_prediction(model: torch.nn.Module, id: str, save_dir_path: str, bbox_threshold: float,
+                    device: torch.device, pred_processor_name: str) -> Processor:
+    Prepares the model and environment for prediction.
+
+    Parameters:
+        - model: torch.nn.Module
+            The model for prediction.
+
+        - id: str
+            The ID for the prediction process.
+
+        - save_dir_path: str
+            The directory path for saving prediction results.
+
+        - bbox_threshold: float
+            The threshold for bounding box predictions.
+
+        - device: torch.device
+            The device for prediction (e.g., CPU or GPU).
+
+        - pred_processor_name: str
+            The name of the prediction processor.
+
+    Returns:
+        - Processor:
+            The prediction processor.
+
+predict(model: torch.nn.Module, device: torch.device, target_geojson_strs: List[str],
+        start: str, stop: str, pred_processor: Processor) -> None:
+    Performs prediction using the provided model and prediction processor.
+
+    Parameters:
+        - model: torch.nn.Module
+            The model for prediction.
+
+        - device: torch.device
+            The device for prediction (e.g., CPU or GPU).
+
+        - target_geojson_strs: List[str]
+            The list of target GeoJSON strings.
+
+        - start: str
+            The start time for prediction.
+
+        - stop: str
+            The end time for prediction.
+
+        - pred_processor: Processor
+            The prediction processor to be used.
+
+---
+
+Constants:
+    - SCRIPT_PATH: str
+        The path of the script for prediction.
+
+    - PRED_PROCESSORS: Dict[str, Type[Processor]]
+        A dictionary mapping prediction processor names to their corresponding classes.

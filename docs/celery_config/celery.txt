@@ -1,0 +1,61 @@
+Python Module: `celery_app.py`
+=========================
+
+Module Description:
+-------------------
+This module initializes and configures a Celery application for executing asynchronous tasks. The Celery application is created using the `Celery` class from the `celery` package. It reads configuration values from environment variables and sets up the necessary parameters for the Celery application.
+
+Author:
+-------
+Richard Correro (richard@richardcorrero.com)
+
+Module Dependencies:
+--------------------
+- celery
+- os
+
+Global Variables:
+----------------
+- `CELERY_APP_NAME` (str): The name of the Celery application, read from the environment variable "CELERY_APP_NAME".
+- `CELERY_APP_INCLUDE` (str): The modules to include in the Celery application, read from the environment variable "CELERY_APP_INCLUDE".
+- `APP_BROKER_URI` (str): The URI of the Celery broker, read from the environment variable "APP_BROKER_URI".
+- `APP_BACKEND_URI` (str): The URI of the Celery backend, read from the environment variable "APP_BACKEND_URI".
+
+Functions:
+----------
+1. `celery_app.start()`: Starts the Celery application.
+
+Classes:
+--------
+None.
+
+Module Usage:
+-------------
+1. Import the required modules and packages:
+```python
+from celery import Celery
+import os
+```
+2. Set the values for the environment variables "CELERY_APP_NAME", "CELERY_APP_INCLUDE", "APP_BROKER_URI", and "APP_BACKEND_URI".
+3. Create a new Celery application instance:
+```python
+celery_app = Celery(
+    CELERY_APP_NAME, broker=APP_BROKER_URI, backend=APP_BACKEND_URI, 
+    include=[CELERY_APP_INCLUDE]
+)
+```
+4. Optionally, update the Celery application configuration settings:
+```python
+celery_app.conf.update(
+    result_expires=3600,
+)
+```
+5. Start the Celery application:
+```python
+if __name__ == '__main__':
+    celery_app.start()
+```
+
+Note:
+-----
+- Refer to the application user guide for additional optional configurations.

@@ -1,0 +1,120 @@
+Module Documentation: mercantile
+
+Web mercator XYZ tile utilities
+
+License:
+This module is licensed under the BSD-3-Clause license.
+
+Copyright 2021, Mapbox
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+* Neither the name of the copyright holder nor the names of
+  its contributors may be used to endorse or promote products derived from
+  this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+Classes:
+
+1. `Tile` - An XYZ web mercator tile
+   - Attributes:
+     - `x`, `y`, `z`: int - x and y indexes of the tile and zoom level z.
+
+2. `LngLat` - A longitude and latitude pair
+   - Attributes:
+     - `lng`, `lat`: float - Longitude and latitude in decimal degrees east or north.
+
+3. `LngLatBbox` - A geographic bounding box
+   - Attributes:
+     - `west`, `south`, `east`, `north`: float - Bounding values in decimal degrees.
+
+4. `Bbox` - A web mercator bounding box
+   - Attributes:
+     - `left`, `bottom`, `right`, `top`: float - Bounding values in meters.
+
+**Functions:**
+
+1. `ul(*tile)` - Returns the upper left longitude and latitude of a tile
+   - Parameters:
+     - `tile`: Tile or sequence of int - The tile coordinates (x, y, z).
+   - Returns:
+     - `LngLat` - The upper left longitude and latitude of the tile.
+
+2. `bounds(*tile)` - Returns the bounding box of a tile
+   - Parameters:
+     - `tile`: Tile or sequence of int - The tile coordinates (x, y, z).
+   - Returns:
+     - `LngLatBbox` - The bounding box of the tile.
+
+3. `truncate_lnglat(lng, lat)` - Truncates the longitude and latitude values to web mercator limits.
+   - Parameters:
+     - `lng`: float - Longitude in decimal degrees.
+     - `lat`: float - Latitude in decimal degrees.
+   - Returns:
+     - `float, float` - The truncated longitude and latitude values.
+
+4. `xy(lng, lat, truncate=False)` - Converts longitude and latitude to web mercator x, y coordinates.
+   - Parameters:
+     - `lng`: float - Longitude in decimal degrees.
+     - `lat`: float - Latitude in decimal degrees.
+     - `truncate`: bool, optional - Whether to truncate or clip inputs to web mercator limits.
+   -
+
+ Returns:
+     - `float, float` - The x, y coordinates in web mercator meters.
+
+5. `lnglat(x, y)` - Converts web mercator x, y coordinates to longitude and latitude.
+   - Parameters:
+     - `x`: float - X coordinate in web mercator meters.
+     - `y`: float - Y coordinate in web mercator meters.
+   - Returns:
+     - `LngLat` - The longitude and latitude coordinates.
+
+6. `parent(*tile)` - Returns the parent tile of a given tile
+   - Parameters:
+     - `tile`: Tile or sequence of int - The tile coordinates (x, y, z).
+   - Returns:
+     - `Tile` - The parent tile.
+
+7. `children(*tile)` - Returns the four children tiles of a given tile
+   - Parameters:
+     - `tile`: Tile or sequence of int - The tile coordinates (x, y, z).
+   - Returns:
+     - `tuple[Tile, Tile, Tile, Tile]` - The four children tiles.
+
+8. `neighbors(*tile)` - Returns the eight neighboring tiles of a given tile
+   - Parameters:
+     - `tile`: Tile or sequence of int - The tile coordinates (x, y, z).
+   - Returns:
+     - `tuple[Tile, Tile, Tile, Tile, Tile, Tile, Tile, Tile]` - The eight neighboring tiles.
+
+9. `quadkey(*tile)` - Returns the quadkey representation of a tile
+   - Parameters:
+     - `tile`: Tile or sequence of int - The tile coordinates (x, y, z).
+   - Returns:
+     - `str` - The quadkey representation of the tile.
+
+10. `quadkey_to_tile(quadkey)` - Converts a quadkey to tile coordinates
+    - Parameters:
+      - `quadkey`: str - The quadkey representation of a tile.
+    - Returns:
+      - `Tile` - The tile coordinates (x, y, z) corresponding to the quadkey.
+
+Note: This is a brief summary of the available classes and functions provided by the `mercantile` module. For detailed usage instructions and examples, please refer to the official documentation or docstrings associated with each class or function.

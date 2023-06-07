@@ -1,0 +1,20 @@
+Module Documentation: exceptions.py
+
+This module defines two custom exception classes used for specific error handling purposes.
+
+Author:
+- Richard Correro (richard@richardcorrero.com)
+
+Classes:
+- MalformedDateStringError(Exception)
+  - Represents an error that occurs when a date string is malformed or does not adhere to the required format.
+
+- IDNotFoundError(Exception)
+  - Represents an error that occurs when an ID is not found or does not exist.
+
+Usage:
+- These exception classes can be raised in the code to handle specific error scenarios.
+- Use these classes as base classes for custom exceptions or handle them directly in the code where appropriate.
+
+Note:
+- No additional functionality or attributes are provided in these exception classes. They serve as markers for specific types of errors.

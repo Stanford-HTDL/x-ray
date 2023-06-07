@@ -1,0 +1,75 @@
+Module Documentation: detection.py
+
+This module provides functions for object detection and evaluation using PyTorch.
+
+Author:
+- Richard Correro (richard@richardcorrero.com)
+
+Functions:
+- feature(
+    bbox: LngLatBbox, fid=None, props=None, projected="geographic", buffer=None, precision=None, id="Bounding Box"
+) -> dict:
+  - Get the GeoJSON feature corresponding to a tile.
+  - Parameters:
+    - bbox (LngLatBbox): The bounding box coordinates.
+    - fid (str, optional): A feature id.
+    - props (dict, optional): Optional extra feature properties.
+    - projected (str, optional): Projection type, default is "geographic".
+    - buffer (float, optional): Optional buffer distance for the GeoJSON polygon.
+    - precision (int, optional): Number of decimal places for GeoJSON coordinates.
+    - id (str, optional): Name associated with the GeoJSON object.
+  - Returns:
+    - dict: A GeoJSON feature.
+
+- bbox_to_geojson(
+    bbox: Sequence[float], lng_lat_bbox: LngLatBbox, image_shape: Sequence[int]
+) -> dict:
+  - Convert a bounding box to a GeoJSON feature.
+  - Parameters:
+    - bbox (Sequence[float]): The bounding box coordinates.
+    - lng_lat_bbox (LngLatBbox): The bounding box in longitude and latitude.
+    - image_shape (Sequence[int]): The shape of the image.
+  - Returns:
+    - dict: A GeoJSON feature.
+
+- collate_fn(batch):
+  - Collate function for data batching.
+
+- train_one_epoch(
+    model: torch.nn.Module, optimizer: torch.optim.Optimizer, data_loader, device, lr_scheduler=None
+) -> float:
+  - Train the model for one epoch.
+  - Parameters:
+    - model (torch.nn.Module): The model to train.
+    - optimizer (torch.optim.Optimizer): The optimizer for model parameters.
+    - data_loader: The data loader.
+    - device: The device to use for training.
+    - lr_scheduler (optional): The learning rate scheduler.
+  - Returns:
+    - float: The running loss during training.
+
+- calculate_map(
+    gt_boxes, pr_boxes, scores, thresh, device, form='pascal_voc'
+) -> float:
+  - Calculate the mean average precision (mAP) for object detection.
+  - Parameters:
+    - gt_boxes: Ground truth bounding boxes.
+    - pr_boxes: Predicted bounding boxes.
+    - scores: Confidence scores of the predicted boxes.
+    - thresh: IoU threshold for matching boxes.
+    - device: The device to use for computation.
+    - form (optional): The format of the bounding box coordinates.
+  - Returns:
+    - float: The mean average precision (mAP) value.
+
+- evaluate(
+    model: torch.nn.Module, data_loader, device, thresh_list
+) -> float:
+  - Evaluate the model's performance on the validation dataset.
+  - Parameters:
+    - model (torch.nn.Module): The trained model.
+    - data_loader: The data loader for the validation dataset.
+    - device: The device to use for evaluation.
+    - thresh_list: List of IoU thresholds for mAP calculation.
+  - Returns:
+    - float: The mean average precision (mAP) value.

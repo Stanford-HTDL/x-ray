@@ -1,0 +1,69 @@
+Module: script_utils.py
+
+__author__:
+    - Richard Correro (richard@richardcorrero.com)
+
+Description:
+    This module provides utility functions for script execution and argument parsing.
+
+Constants:
+    - SCRIPT_PATH: The filename of the script.
+
+    - DEFAULT_LOGGING: The default logging level.
+
+    - DEFAULT_TIME_STR: The default timestamp string format.
+
+    - DEFAULT_LOG_DIR: The default directory for log files.
+
+    - RANDOM_STRING_SEED: The seed used for generating random strings.
+
+Functions:
+    - parse_args(parser: argparse.ArgumentParser) -> dict:
+        Parses command line arguments and returns them as a dictionary.
+
+    - get_random_string(length: int = 12, allowed_chars: str = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') -> str:
+        Generates a securely random string of the specified length using the provided character set.
+
+    - tuple_to_args(fn, is_method: Optional[bool] = False) -> function:
+        Decorator function to convert a tuple argument to individual arguments for a function or method.
+
+    - async_tuple_to_args(fn, is_method: Optional[bool] = False) -> coroutine function:
+        Decorator function to convert a tuple argument to individual arguments for an asynchronous function or method.
+
+    - arg_is_true(arg_str: str) -> bool:
+        Checks if the string argument represents a boolean True value.
+
+    - arg_is_false(arg_str: str) -> bool:
+        Checks if the string argument represents a boolean False value.
+
+    - get_args(script_path, logging_level = DEFAULT_LOGGING, time_str = DEFAULT_TIME_STR, log_dir = DEFAULT_LOG_DIR, log_filepath = None, verbose = True, secret_keys = list(), format_str = "%(asctime)s | %(message)s", **kwargs) -> dict:
+        Parses command line arguments, sets up logging, and returns a dictionary of arguments.
+
+        Parameters:
+            - script_path: The filename of the script.
+            - logging_level: The desired logging level. Default is DEFAULT_LOGGING.
+            - time_str: The timestamp string format. Default is DEFAULT_TIME_STR.
+            - log_dir: The directory for log files. Default is DEFAULT_LOG_DIR.
+            - log_filepath: The path to a local log file. If None, a default filepath is generated. Default is None.
+            - verbose: Whether to print the arguments to the console. Default is True.
+            - secret_keys: List of keys to be redacted in the log file. Default is an empty list.
+            - format_str: The format string for log messages. Default is "%(asctime)s | %(message)s".
+            - **kwargs: Additional keyword arguments to include in the returned dictionary.
+
+        Returns:
+            - p_args: A dictionary containing the parsed arguments.
+
+Usage:
+    - Import the module and use the provided functions for script execution and argument parsing.
+    - Example:
+        ```
+        from script_utils import parse_args, get_random_string
+
+        parser = argparse.ArgumentParser()
+        args = parse_args(parser)
+        random_string = get_random_string()
+        ```
+
+Note:
+    - This module requires the following dependencies: argparse, hashlib, logging, functools, os, random, time, typing.
+    - The module uses a secure random number generator if available, falling back to the Mersenne Twister otherwise.

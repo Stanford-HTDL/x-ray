@@ -1,0 +1,54 @@
+Module: models.py
+
+__author__ = "Richard Correro (richard@richardcorrero.com)"
+
+Imports:
+- torch.nn as nn
+- from ..utils import get_env_var_with_default
+- from .model_loaders import fasterrcnn_resnet_fpn
+- from .script_utils import arg_is_true
+
+Classes:
+- FasterRCNN
+
+Functions:
+- parse_args
+- forward
+
+Class: FasterRCNN(nn.Module)
+- Description: Implements the Faster R-CNN object detection model.
+- Inherits: torch.nn.Module
+
+Attributes:
+- __name__: Name of the FasterRCNN class ("FasterRCNN")
+- IS_OBJECT_DETECTOR: Boolean indicating if it's an object detector (True)
+- DEFAULT_BACKBONE_NAME: Default backbone name ("resnet50")
+- DEFAULT_NUM_CHANNELS: Default number of input channels (3)
+- DEFAULT_NUM_CLASSES: Default number of output classes (2)
+- DEFAULT_TRAINABLE_LAYERS: Default number of trainable backbone layers (0)
+- DEFAULT_PRETRAINED: Default value for using pretrained weights (False)
+- DEFAULT_PROGRESS: Default value for showing progress during model loading (False)
+- DEFAULT_PRETRAINED_BACKBONE: Default value for using pretrained backbone weights (True)
+- DEFAULT_MIN_SIZE: Default minimum input image size (224)
+- DEFAULT_MAX_SIZE: Default maximum input image size (224)
+
+Methods:
+- __init__(**kwargs): Initializes the FasterRCNN class instance.
+  - Parameters:
+    - **kwargs: Keyword arguments for additional customization.
+- parse_args(): Parses the environment variables and returns a dictionary of arguments.
+- forward(*args, **kwargs): Forward pass of the model.
+  - Parameters:
+    - *args: Variable length argument list.
+    - **kwargs: Keyword arguments.
+
+Function: parse_args()
+- Description: Parses the environment variables and returns a dictionary of arguments.
+- Returns: Dictionary of arguments.
+
+Function: forward(*args, **kwargs)
+- Description: Forward pass of the model.
+- Parameters:
+  - *args: Variable length argument list.
+  - **kwargs: Keyword arguments.
+- Returns: Output of the model's forward pass.
