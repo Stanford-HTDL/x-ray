@@ -1,4 +1,7 @@
 # `X-Ray` Documentation
+# Richard Correro (richard@richardcorrero.com)
+
+This repository contains Python code for performing computer vision tasks using Celery with RabbitMQ as the message broker. It utilizes PyTorch and other geospatial imagery processing tools to process the received messages. The results are returned using Redis with Celery, and are also uploaded to Google Cloud Storage. The code is designed to be run in Docker containers using Docker Compose.
 
 Python Module: `celery_app.py`
 =========================
